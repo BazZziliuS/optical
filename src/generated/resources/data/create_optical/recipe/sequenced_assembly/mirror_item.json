@@ -1,0 +1,48 @@
+{
+  "type": "create:sequenced_assembly",
+  "ingredient": {
+    "item": "minecraft:glass_pane"
+  },
+  "results": [
+    {
+      "chance": 100.0,
+      "id": "create_optical:mirror"
+    }
+  ],
+  "sequence": [
+    {
+      "type": "create:filling",
+      "ingredients": [
+        {
+          "item": "create_optical:incomplete_mirror"
+        },
+        {
+          "type": "neoforge:single",
+          "amount": 250,
+          "fluid": "minecraft:water"
+        }
+      ],
+      "results": [
+        {
+          "id": "create_optical:incomplete_mirror"
+        }
+      ]
+    },
+    {
+      "type": "create:pressing",
+      "ingredients": [
+        {
+          "item": "create_optical:incomplete_mirror"
+        }
+      ],
+      "results": [
+        {
+          "id": "create_optical:incomplete_mirror"
+        }
+      ]
+    }
+  ],
+  "transitional_item": {
+    "id": "create_optical:incomplete_mirror"
+  }
+}

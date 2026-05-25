@@ -4,30 +4,30 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.simibubi.create.AllBlocks;
 import com.simibubi.create.compat.jei.category.animations.AnimatedKinetics;
-import com.simibubi.create.foundation.gui.element.GuiGameElement;
-import com.simibubi.create.foundation.utility.AnimationTickHolder;
+
+import org.jetbrains.annotations.NotNull;
+
+import net.createmod.catnip.animation.AnimationTickHolder;
+import net.createmod.catnip.gui.element.GuiGameElement;
 import net.lpcamors.optical.COPartialModels;
 import net.lpcamors.optical.blocks.COBlocks;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.Direction;
-import org.jetbrains.annotations.NotNull;
 
 public class AnimatedFocus extends AnimatedKinetics {
 
+    private static final int CYCLE_TICK = 15;
+    private static final float HEIGHT = 21 / 16F;
 
-
-    private int tick = 0;
     private final boolean depot;
-    public AnimatedFocus(boolean depot){
+
+    public AnimatedFocus(boolean depot) {
         this.depot = depot;
     }
 
-
     @Override
     public void draw(@NotNull GuiGraphics graphics, int xOffset, int yOffset) {
-        tick += 1;
         float tic = AnimationTickHolder.getRenderTime();
-        double angle = getAngleByTick(tic, 18, 0.08, 1.2);
         PoseStack matrixStack = graphics.pose();
         matrixStack.pushPose();
         matrixStack.translate(xOffset, yOffset, 200);
@@ -40,19 +40,25 @@ public class AnimatedFocus extends AnimatedKinetics {
                 .scale(scale)
                 .render(graphics);
 
-        GuiGameElement.GuiRenderBuilder r = GuiGameElement.of(COPartialModels.FOCUS_BEAM_UI)
+        GuiGameElement.GuiRenderBuilder r = GuiGameElement.of(COPartialModels.FOCUS_BEAM)
                 .scale(scale)
-                .rotateBlock(0, 90, angle)
-                .atLocal(0, 0.3, 0)
-                .withAlpha(0.3F);
+                .rotateBlock(0, 90, 0)
+                .atLocal(0, -0.1 + getYOffset(tic, 0), 0)
+                .withAlpha(0.11F);
         r.render(graphics);
 
+        GuiGameElement.GuiRenderBuilder r1 = GuiGameElement.of(COPartialModels.FOCUS_BEAM)
+                .scale(scale)
+                .rotateBlock(0, 90, 0)
+                .atLocal(0, -0.1 + getYOffset(tic, 1), 0)
+                .withAlpha(0.11F);
+        r1.render(graphics);
 
         blockElement(COBlocks.BEAM_FOCUSER.getDefaultState())
-
                 .scale(scale)
                 .render(graphics);
-        if(depot){
+
+        if (depot) {
             blockElement(AllBlocks.DEPOT.getDefaultState())
                     .atLocal(0, 1.65, 0)
                     .scale(scale)
@@ -62,11 +68,10 @@ public class AnimatedFocus extends AnimatedKinetics {
         matrixStack.popPose();
     }
 
-    //Use alpha = (0, pi/2]
-    //alpha = 0, diverge, alpha -> you get basic cos sin behaviour
-    public static double getAngleByTick(float tick, double radius, double angFreq, double alpha){
-        double x = Math.cos(angFreq * tick);
-        return radius * Math.tan(x * alpha) / Math.tan(alpha);
+    private float getYOffset(float tick, int index) {
+        
+        float pt = tick - (int) tick;
+        int ticks = ((index * CYCLE_TICK / 2) + (int) tick) % CYCLE_TICK;
+        return (ticks + pt) * (HEIGHT / (float) CYCLE_TICK);
     }
-
 }

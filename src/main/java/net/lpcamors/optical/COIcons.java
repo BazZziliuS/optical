@@ -4,20 +4,20 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.simibubi.create.foundation.gui.AllIcons;
-import com.simibubi.create.foundation.utility.Color;
+import net.createmod.catnip.theme.Color;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 import org.joml.Matrix4f;
 
 public class COIcons extends AllIcons {
 
-    public static final ResourceLocation ICON_ATLAS = new ResourceLocation(COMod.ID, "textures/gui/icons.png");
+    public static final ResourceLocation ICON_ATLAS = ResourceLocation.fromNamespaceAndPath(CreateOptical.ID, "textures/gui/icons.png");
     private int iconX;
     private int iconY;
     private static int x = 0, y = -1;
@@ -81,11 +81,10 @@ public class COIcons extends AllIcons {
     }
     @OnlyIn(Dist.CLIENT)
     private void vertex(VertexConsumer builder, Matrix4f matrix, Vec3 vec, Color rgb, float u, float v, int light) {
-        builder.vertex(matrix, (float) vec.x, (float) vec.y, (float) vec.z)
-                .color(rgb.getRed(), rgb.getGreen(), rgb.getBlue(), 255)
-                .uv(u, v)
-                .uv2(light)
-                .endVertex();
+        builder.addVertex(matrix, (float) vec.x, (float) vec.y, (float) vec.z)
+                .setColor(rgb.getRed(), rgb.getGreen(), rgb.getBlue(), 255)
+                .setUv(u, v)
+                .setLight(light);
     }
 
 }

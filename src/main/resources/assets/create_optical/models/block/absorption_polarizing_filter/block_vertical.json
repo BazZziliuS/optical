@@ -1,0 +1,6 @@
+{
+    "parent": "create_optical:block/absorption_polarizing_filter/block",
+    "textures": {
+        "filter": "create_optical:block/absorption_polarizing_filter/vertical_filter"
+    }
+}   

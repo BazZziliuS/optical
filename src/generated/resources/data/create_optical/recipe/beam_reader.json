@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "create:brass_casing"
+    },
+    {
+      "item": "create_optical:optical_device"
+    }
+  ],
+  "result": {
+    "count": 1,
+    "id": "create_optical:beam_reader"
+  }
+}

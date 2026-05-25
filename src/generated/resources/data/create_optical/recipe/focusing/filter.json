@@ -1,0 +1,15 @@
+{
+  "type": "create_optical:focusing",
+  "ingredients": [
+    {
+      "item": "minecraft:tinted_glass"
+    }
+  ],
+  "mode": 2,
+  "processing_time": 50,
+  "results": [
+    {
+      "id": "create_optical:polarizing_filter"
+    }
+  ]
+}

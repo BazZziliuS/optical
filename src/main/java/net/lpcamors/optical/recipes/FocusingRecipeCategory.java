@@ -1,11 +1,12 @@
 package net.lpcamors.optical.recipes;
 
+import java.util.List;
+
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.simibubi.create.compat.jei.category.CreateRecipeCategory;
-import com.simibubi.create.compat.jei.category.MillingCategory;
 import com.simibubi.create.content.processing.recipe.ProcessingOutput;
 import com.simibubi.create.foundation.gui.AllGuiTextures;
-import com.simibubi.create.foundation.utility.Lang;
+
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
 import mezz.jei.api.gui.ingredient.IRecipeSlotsView;
 import mezz.jei.api.recipe.IFocusGroup;
@@ -14,8 +15,6 @@ import net.lpcamors.optical.data.COLang;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
-
-import java.util.List;
 
 public class FocusingRecipeCategory extends CreateRecipeCategory<FocusingRecipe> {
 
@@ -31,7 +30,7 @@ public class FocusingRecipeCategory extends CreateRecipeCategory<FocusingRecipe>
                 .addSlot(RecipeIngredientRole.INPUT, 21, 48)
                 .setBackground(getRenderedSlot(), -1, -1)
                 .addIngredients(recipe.getIngredients().get(0));
-        if(recipe.getIngredients().size() > 1){
+        if (recipe.getIngredients().size() > 1) {
             int x = 70;
             int y = 12;
             builder.addSlot(RecipeIngredientRole.CATALYST, x, y)
@@ -49,7 +48,7 @@ public class FocusingRecipeCategory extends CreateRecipeCategory<FocusingRecipe>
                     .addSlot(RecipeIngredientRole.OUTPUT, single ? 141 : 135 + xOffset, 48 + yOffset)
                     .setBackground(getRenderedSlot(output), -1, -1)
                     .addItemStack(output.getStack())
-                    .addTooltipCallback(addStochasticTooltip(output));
+                    .addRichTooltipCallback(addStochasticTooltip(output));
 
             i++;
         }
@@ -61,7 +60,8 @@ public class FocusingRecipeCategory extends CreateRecipeCategory<FocusingRecipe>
     }
 
     @Override
-    public void draw(FocusingRecipe recipe, IRecipeSlotsView iRecipeSlotsView, GuiGraphics graphics, double mouseX, double mouseY) {
+    public void draw(FocusingRecipe recipe, IRecipeSlotsView iRecipeSlotsView, GuiGraphics graphics, double mouseX,
+            double mouseY) {
         PoseStack ms = graphics.pose();
         ms.pushPose();
         renderWidgets(graphics, recipe, mouseX, mouseY);
@@ -77,9 +77,9 @@ public class FocusingRecipeCategory extends CreateRecipeCategory<FocusingRecipe>
             AllGuiTextures.JEI_DOWN_ARROW.render(graphics, 136, -19 * (vRows - 1) + 32);
         AllGuiTextures heatBar = AllGuiTextures.JEI_NO_HEAT_BAR;
         heatBar.render(graphics, 4, 80);
-        graphics.drawString(Minecraft.getInstance().font, COLang.Prefixes.JEI.translate(recipe.getRequiredBeamType().getTranslationKey()), 9,
+        graphics.drawString(Minecraft.getInstance().font,
+                COLang.Prefixes.JEI.translate(recipe.getRequiredBeamType().getTranslationKey()), 9,
                 86, recipe.getRequiredBeamType().getColor(), false);
     }
-
 
 }

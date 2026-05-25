@@ -4,114 +4,124 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.datafixers.util.Pair;
 import com.simibubi.create.AllPartialModels;
 import com.simibubi.create.content.kinetics.base.KineticBlockEntityRenderer;
-import com.simibubi.create.content.kinetics.clock.CuckooClockBlockEntity;
-import com.simibubi.create.foundation.render.CachedBufferer;
-import com.simibubi.create.foundation.render.RenderTypes;
-import com.simibubi.create.foundation.render.SuperByteBuffer;
-import com.simibubi.create.foundation.utility.AngleHelper;
+
+import net.createmod.catnip.math.AngleHelper;
+import net.createmod.catnip.render.CachedBuffers;
+import net.createmod.catnip.render.SuperByteBuffer;
 import net.lpcamors.optical.COPartialModels;
+import net.lpcamors.optical.CORenderTypes;
 import net.lpcamors.optical.COUtils;
 import net.lpcamors.optical.blocks.IBeamReceiver;
-import net.lpcamors.optical.blocks.IBeamSource;
-import net.lpcamors.optical.blocks.absorption_polarizing_filter.AbsorptionPolarizingFilter;
 import net.lpcamors.optical.blocks.optical_source.BeamHelper;
+import net.lpcamors.optical.blocks.optical_source.GenericOpticalSourceBlockEntity;
+import net.lpcamors.optical.blocks.optical_source.GenericOpticalSourceBlockEntity.BeamSection;
 import net.lpcamors.optical.blocks.optical_source.OpticalSourceBlock;
-import net.lpcamors.optical.blocks.optical_source.OpticalSourceBlockEntity;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
-import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.util.Mth;
+import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
-import java.util.ArrayList;
-import java.util.List;
+public class OpticalSourceRenderer extends KineticBlockEntityRenderer<GenericOpticalSourceBlockEntity> {
 
-public class OpticalSourceRenderer extends KineticBlockEntityRenderer<OpticalSourceBlockEntity> {
-
-     public OpticalSourceRenderer(BlockEntityRendererProvider.Context context) {
+    public OpticalSourceRenderer(BlockEntityRendererProvider.Context context) {
         super(context);
     }
 
     @Override
-    public boolean shouldRenderOffScreen(OpticalSourceBlockEntity p_112306_) {
-        return true;
+    public boolean shouldRenderOffScreen(GenericOpticalSourceBlockEntity be) {
+        return be.shouldRenderBeam();
     }
 
     @Override
-    protected void renderSafe(OpticalSourceBlockEntity be, float partialTicks, PoseStack ms, MultiBufferSource buffer, int light, int overlay) {
+    protected void renderSafe(GenericOpticalSourceBlockEntity be, float partialTicks, PoseStack ms,
+            MultiBufferSource buffer, int light, int overlay) {
         super.renderSafe(be, partialTicks, ms, buffer, light, overlay);
+        if (be.shouldRenderBeam()) {
+            renderLaserBeam(be, be.getBlockState(), ms, buffer);
+        }
 
+    }
 
-        if(be.shouldRendererLaserBeam()) {
-            IBeamSource.ClientSide.renderLaserBeam(be, be.getBlockState(), ms, buffer);
-            /*
-            Vec3 pos = be.getBlockPos().getCenter();
-            //IBeamSource.ClientSide.renderLaserBeam(opticalLaserSourceBlockEntity, partialTicks, ms, buffer, light);
-            BlockState state = be.getBlockState();
-            List<Pair<Vec3i, Vec3i>> blockPosToBeam = be.getBeamPropertiesMap().keySet().stream().toList();
+    public static void renderLaserBeam(GenericOpticalSourceBlockEntity be, BlockState state, PoseStack ms,
+            MultiBufferSource buffer) {
 
-            Direction direction = state.getValue(AbsorptionPolarizingFilter.FACING);
+        Vec3 pos = be.getBlockPos().getCenter();
 
-            for (int i = 0; i < blockPosToBeam.size() ; i++) {
+        Direction direction = state.getValue(HorizontalDirectionalBlock.FACING);
+        for (BeamSection section : be.sections) {
+            Pair<Vec3i, Vec3i> pair = new Pair<>(section.fromPos(), section.toPos());
 
-                Pair<Vec3i, Vec3i> pair = blockPosToBeam.get(i);
+            BeamHelper.BeamProperties beamProperties = section.beamProperties();
+            Vec3i color = beamProperties.color();
+            direction = beamProperties.direction();
 
-                BeamHelper.BeamProperties beamProperties = be.getBeamPropertiesMap().get(pair);
-                direction = beamProperties.direction;
-                Vec3 start0 = Vec3.atCenterOf(pair.getFirst());
-                Vec3 end0 = Vec3.atCenterOf(pair.getSecond());
+            int jMax = be.getBeamRadiusCount(),
+                    jRest = Math.max(0, jMax - 10);
+            Vec3 start0 = Vec3.atCenterOf(pair.getFirst()),
+                    start = start0.subtract(IBeamReceiver.getLaserIrradiatedFaceOffsetVar(beamProperties.direction(),
+                            new BlockPos(pair.getFirst()), be.getLevel())),
+                    end0 = Vec3.atCenterOf(pair.getSecond()),
+                    end = end0.add(IBeamReceiver.getLaserIrradiatedFaceOffsetVar(beamProperties.direction(),
+                            new BlockPos(pair.getSecond()), be.getLevel())),
+                    dir = COUtils.getNormalUnitary(direction), nDir = COUtils.vecOf(1).subtract(dir);
+            ;
 
-                Vec3 start = start0.subtract(IBeamReceiver.getLaserIrradiatedFaceOffset(beamProperties.direction, new BlockPos(pair.getFirst()), be.getLevel()));
-                Vec3 end = end0.add(IBeamReceiver.getLaserIrradiatedFaceOffset(beamProperties.direction, new BlockPos(pair.getSecond()), be.getLevel()));
+            ms.pushPose();
 
-                ms.pushPose();
+            translateForVec(ms, start0.subtract(pos));
+            translateForVec(ms, start.subtract(start0));
+            translateForVec(ms, end.subtract(start).multiply(0.5D, 0.5D, 0.5D));
 
-                translateForVec(ms, start0.subtract(pos));
-                translateForVec(ms, start.subtract(start0));
-                translateForVec(ms, end.subtract(start).multiply(0.5D, 0.5D, 0.5D));
-                //Vec3 vec2 = end.subtract(start);
-                //ms.translate(vec2.x / 2, vec3.y / 2,vec3.z / 2);
+            float length = (float) end.subtract(start).length();
 
-
-                float f = (float) end.subtract(start).length();
-                float f1 = (float) end.subtract(start).length();
-
-                SuperByteBuffer laser = CachedBufferer.partial(COPartialModels.LASER_BEAM, state)
-                        .light(LightTexture.FULL_BRIGHT)
-                        .disableDiffuse();
-
-
-                Vec3 dir = direction.getAxisDirection() == Direction.AxisDirection.POSITIVE ?
-                        Vec3.atLowerCornerOf(direction.getNormal()) :
-                        Vec3.atLowerCornerOf(direction.getNormal()).scale(-1) ;
-                Vec3 nDir = new Vec3(1,1,1).subtract(dir);
-
-                Vec3i color = COUtils.getColor(beamProperties.dyeColor);
-                for(int j = 0; j < 3 + Math.floor(beamProperties.intensity / 16); j ++){
-                    SuperByteBuffer laser0 = laser;
-                    double radius = 0.8 + j * 0.2;
-                    int alpha = (int) (255 * (1 - j / 10F));
-                    laser0.color(color.getX(), color.getY(), color.getZ(), alpha);
-                    scaleForVec(laser0, dir.scale(f).add(nDir));
-                    scaleForVec(laser0, nDir.scale(radius).add(dir));
-                    rotateDirection(laser0, direction);
-                    laser0.renderInto(ms, j == 0 ? buffer.getBuffer(RenderTypes.getAdditive()): buffer.getBuffer(RenderType.translucentNoCrumbling()));
-                }
+            if (COPartialModels.LASER_BEAM.get() == null) {
                 ms.popPose();
+                continue;
             }
 
-             */
+            SuperByteBuffer laser = CachedBuffers.partial(COPartialModels.LASER_BEAM, state)
+                    .light(LightTexture.FULL_BRIGHT)
+                    .disableDiffuse();
+
+            for (int j = 0; j < jMax; j++) {
+                SuperByteBuffer laser0 = laser;
+                double radius = 0.8 + (j + jRest) * 0.2;
+                int alpha = (int) (155 * (1 - j / 10F));
+                laser0.color(color.getX(), color.getY(), color.getZ(), alpha);
+                scaleForVec(laser0, dir.scale(length).add(nDir));
+                scaleForVec(laser0, nDir.scale(radius).add(dir));
+                rotateDirection(laser0, direction);
+                laser0.renderInto(ms, buffer.getBuffer(CORenderTypes.TRANSPARENT_ADDITIVE)
+                        .setLight((int) (LightTexture.FULL_BRIGHT)));
+
+            }
+            ms.popPose();
         }
     }
 
+    static void translateForVec(PoseStack ms, Vec3 vec3) {
+        ms.translate(vec3.x, vec3.y, vec3.z);
+    }
+
+    static void scaleForVec(SuperByteBuffer s, Vec3 vec3) {
+        s.center().scale((float) vec3.x, (float) vec3.y, (float) vec3.z).uncenter();
+    }
+
+    static void rotateDirection(SuperByteBuffer buffer, Direction direction) {
+        float yRot = (float) (AngleHelper.horizontalAngle(direction) * Math.PI / 180f);
+        float xRot = direction.getStepY() * (float) Math.PI / 2F;
+        buffer.rotateCentered(yRot, Direction.UP);
+        buffer.rotateCentered(xRot, Direction.EAST);
+
+    }
+
     @Override
-    public boolean shouldRender(OpticalSourceBlockEntity p_173568_, Vec3 p_173569_) {
+    public boolean shouldRender(GenericOpticalSourceBlockEntity p_173568_, Vec3 p_173569_) {
         return true;
     }
 
@@ -120,13 +130,11 @@ public class OpticalSourceRenderer extends KineticBlockEntityRenderer<OpticalSou
         return 256;
     }
 
-
-
     @Override
-    protected SuperByteBuffer getRotatedModel(OpticalSourceBlockEntity opticalLaserSourceBlockEntity, BlockState state) {
-        return CachedBufferer.partialFacing(AllPartialModels.SHAFT_HALF, state, state
+    protected SuperByteBuffer getRotatedModel(GenericOpticalSourceBlockEntity opticalLaserSourceBlockEntity,
+            BlockState state) {
+        return CachedBuffers.partialFacing(AllPartialModels.SHAFT_HALF, state, state
                 .getValue(OpticalSourceBlock.HORIZONTAL_FACING)
                 .getOpposite());
     }
-
 }

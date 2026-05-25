@@ -1,42 +1,50 @@
 {
+	"format_version": "1.21.6",
 	"credit": "Made with Blockbench",
 	"parent": "block/block",
 	"render_type": "minecraft:transparent",
 	"texture_size": [32, 32],
 	"textures": {
-		"1": "create_optical:block/polarizing_beam_splitter_block/polarizing_beam_splitter_cube",
-		"particle": "create:block/andesite_casing"
+		"1": "create_optical:block/polarizing_beam_splitter_block/polarizing_beam_splitter_cube"
 	},
 	"elements": [
 		{
-			"from": [3, 3, 3],
-			"to": [13, 13, 13],
-			"rotation": {"angle": 0, "axis": "y", "origin": [0, 0, 0]},
+			"from": [7.5, 2, 2],
+			"to": [8.5, 14, 14],
+			"rotation": {"angle": 45, "axis": "y", "origin": [8, 8, 8]},
 			"faces": {
-				"north": {"uv": [0, 0, 5, 5], "texture": "#1"},
-				"east": {"uv": [0, 0, 5, 5], "texture": "#1"},
-				"south": {"uv": [0, 0, 5, 5], "texture": "#1"},
-				"west": {"uv": [0, 0, 5, 5], "texture": "#1"},
-				"up": {"uv": [0, 5, 5, 10], "texture": "#1"},
-				"down": {"uv": [0, 5, 5, 10], "texture": "#1"}
+				"north": {"uv": [0, 0, 0.5, 6], "texture": "#1"},
+				"east": {"uv": [6.5, 0, 12.5, 6], "rotation": 270, "texture": "#1"},
+				"south": {"uv": [0, 0, 0.5, 6], "texture": "#1"},
+				"west": {"uv": [6.5, 0, 12.5, 6], "rotation": 270, "texture": "#1"}
+			}
+		},
+		{
+			"from": [2, 1, 2],
+			"to": [14, 15, 14],
+			"rotation": {"angle": 0, "axis": "y", "origin": [0, -16, 0]},
+			"faces": {
+				"north": {"uv": [6, 0, 13, 6], "rotation": 90, "texture": "#1"},
+				"east": {"uv": [6, 0, 13, 6], "rotation": 90, "texture": "#1"},
+				"south": {"uv": [6, 0, 13, 6], "rotation": 90, "texture": "#1"},
+				"west": {"uv": [6, 0, 13, 6], "rotation": 90, "texture": "#1"}
 			}
 		}
 	],
 	"groups": [
 		{
-			"name": "bars",
-			"origin": [8, 8, 8],
-			"children": []
-		},
-		{
-			"name": "base",
-			"origin": [0, 0, 0],
-			"children": []
-		},
-		{
 			"name": "group",
 			"origin": [8, 8, 8],
-			"children": [0]
+			"color": 0,
+			"children": [
+				{
+					"name": "group",
+					"origin": [8, 8, 8],
+					"color": 0,
+					"children": [0]
+				},
+				1
+			]
 		}
 	]
 }

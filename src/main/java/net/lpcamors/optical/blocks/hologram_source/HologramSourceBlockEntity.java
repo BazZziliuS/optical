@@ -1,19 +1,35 @@
 package net.lpcamors.optical.blocks.hologram_source;
 
-import com.simibubi.create.content.equipment.goggles.IHaveGoggleInformation;
-import com.simibubi.create.content.equipment.goggles.IHaveHoveringInformation;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+import com.simibubi.create.api.equipment.goggles.IHaveGoggleInformation;
+import com.simibubi.create.api.equipment.goggles.IHaveHoveringInformation;
 import com.simibubi.create.foundation.blockEntity.SmartBlockEntity;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
-import com.simibubi.create.foundation.utility.NBTHelper;
+
+import net.createmod.catnip.nbt.NBTHelper;
 import net.lpcamors.optical.COUtils;
-import net.lpcamors.optical.blocks.IBeamReceiver;
+import net.lpcamors.optical.CreateOptical;
+import net.lpcamors.optical.blocks.COBlockEntities;
 import net.lpcamors.optical.blocks.optical_source.BeamHelper;
+import net.lpcamors.optical.blocks.optical_source.BeamHelper.BeamProperties;
 import net.lpcamors.optical.data.COLang;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.Direction.Axis;
+import net.minecraft.core.Direction.AxisDirection;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.IntTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtUtils;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.world.item.ItemStack;
@@ -21,329 +37,369 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import org.checkerframework.checker.units.qual.C;
 
-import javax.annotation.Nullable;
-import javax.swing.text.html.Option;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
+public class HologramSourceBlockEntity extends SmartBlockEntity
+        implements IHaveGoggleInformation, IHaveHoveringInformation {
 
-public class HologramSourceBlockEntity extends SmartBlockEntity implements IHaveGoggleInformation, IHaveHoveringInformation {
-
-    private IBeamReceiver.BeamSourceInstance beamSourceInstance = IBeamReceiver.BeamSourceInstance.empty(null);
-
-    private HologramSourceProfile profile = new HologramSourceProfile(this.getBlockPos());
-    private boolean isController = true;
-
+    private Optional<BeamProperties> optionalBeamProperties = Optional.empty();
+    private @Nullable HologramSourceProfile profile;
+    private BlockPos controllerPos;
+    private int tickCount = 0;
 
     public HologramSourceBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
+        setLazyTickRate(10);
+        this.controllerPos = pos;
+        this.profile = null;
     }
 
-    private boolean shouldBeController(){
-        BlockState state = this.getBlockState();
-        if(!(state.getBlock() instanceof HologramSourceBlock hologramSourceBlock)) return false;
-        return HologramSourceBlock.getConnection(state, this.getBlockPos(), this.level, Direction.AxisDirection.NEGATIVE).isEmpty();
+    public int getTickCount() {
+        return tickCount;
     }
-    private int calculateConnectionLength(){
-        BlockState state = this.getBlockState();
-        if(!(state.getBlock() instanceof HologramSourceBlock hologramSourceBlock)) return 0;
-        HologramSourceBlockEntity be;
+
+    @Override
+    public void tick() {
+        this.tickCount++;
+    }
+
+    @Override
+    public void lazyTick() {
+        super.lazyTick();
+        if (this.isController() && !this.level.isClientSide) {
+            this.updateChain();
+        }
+    }
+
+    public void updateChain() {
+        if (!this.shouldBeController()) {
+            this.findController().updateChain();
+            return;
+        }
+
+        Direction dir = Direction.fromAxisAndDirection(HologramSourceBlock.getConnectionAxis(this.getBlockState()),
+                AxisDirection.POSITIVE);
 
         BlockPos pos = this.getBlockPos();
-        AtomicReference<Integer> l = new AtomicReference<>(0);
-        onConnection(pos, false, hologramSourceBlockEntity -> l.updateAndGet(v -> v + 1));
-        return l.get();
+        HologramSourceBlockEntity be = this;
+        Axis axis = HologramSourceBlock.getConnectionAxis(be.getBlockState());
+
+        int length = 1;
+
+        HologramSourceProfile lastProfile = null;
+        while (true) {
+            pos = pos.relative(dir);
+            Optional<HologramSourceBlockEntity> opt = this.level.getBlockEntity(pos,
+                    COBlockEntities.HOLOGRAM_SOURCE.get());
+            if (!opt.isPresent())
+                break;
+            if (!axis.equals(HologramSourceBlock.getConnectionAxis(opt.get().getBlockState()))) {
+                break;
+            }
+
+            if (opt.get().profile != null) {
+                lastProfile = opt.get().profile;
+            }
+            length++;
+            opt.get().controllerPos = this.getBlockPos();
+            opt.get().profile = null;
+            opt.get().update();
+        }
+        if (this.profile == null) {
+            if (lastProfile == null) {
+                this.profile = new HologramSourceProfile();
+            } else {
+                this.profile = lastProfile;
+            }
+        }
+        this.profile.setConnectionLength(length);
+        this.controllerPos = this.getBlockPos();
+        this.update();
     }
 
-    public void onConnection(BlockPos pos, boolean toConnector, Consumer<Optional<HologramSourceBlockEntity>> consumer){
-        Direction.AxisDirection direction = toConnector ? Direction.AxisDirection.NEGATIVE : Direction.AxisDirection.POSITIVE;
-        Optional<HologramSourceBlockEntity> be;
-        BlockPos pos1 = pos;
-        do {
-            be = HologramSourceBlock.getConnection(this.getBlockState(), pos1, this.level, direction);
-            if(be.isPresent()) pos1 = be.get().getBlockPos();
-            //pos1 = pos1.relative(Direction.fromAxisAndDirection(HologramSourceBlock.getConnectionAxis(this.getBlockState()),direction));
-            consumer.accept(be);
-        } while (be.isPresent());
+    private boolean shouldBeController() {
+        BlockState state = this.getBlockState();
+        if (!(state.getBlock() instanceof HologramSourceBlock))
+            return false;
+
+        Axis axis = HologramSourceBlock.getConnectionAxis(this.getBlockState());
+        Direction dir = Direction.fromAxisAndDirection(axis,
+                AxisDirection.NEGATIVE);
+        Optional<HologramSourceBlockEntity> opt = this.level.getBlockEntity(this.getBlockPos().relative(dir),
+                COBlockEntities.HOLOGRAM_SOURCE.get());
+        if (opt.isEmpty())
+            return true;
+        return !axis.equals(HologramSourceBlock.getConnectionAxis(opt.get().getBlockState()));
     }
 
     public boolean isController() {
-        return isController;
+        return this.getBlockPos().equals(this.controllerPos);
     }
 
-    public void onAdded(){
-        if(this.getLevel() == null || getLevel().isClientSide) return;
-        AtomicReference<HologramSourceBlockEntity> newController = new AtomicReference<>(this);
-        final HologramSourceProfile[] lastProfile = {null};
-        List.of(Direction.AxisDirection.POSITIVE, Direction.AxisDirection.NEGATIVE).forEach(axisDirection -> {
-            HologramSourceBlock.getConnection(this.getBlockState(), this.getBlockPos(), this.getLevel(), axisDirection)
-                    .ifPresent(be -> {
-                        HologramSourceBlockEntity controller = be.getController();
-                        if(controller == null) return;
-                        newController.set(controller);
-                        if(!controller.shouldBeController()) {
-                            newController.set(controller.findController());
-                            lastProfile[0] = controller.profile;
-                        }
-                    });
-        });
-        if(lastProfile[0] != null) newController.get().profile.update(lastProfile[0]);
-        newController.get().updateConnection(newController.get());
-        onConnection(newController.get().getBlockPos(), false, opbe -> opbe.ifPresent(be -> be.updateConnection(newController.get())));
-    }
+    public @Nonnull HologramSourceBlockEntity findController() {
 
+        Direction dir = Direction.fromAxisAndDirection(HologramSourceBlock.getConnectionAxis(this.getBlockState()),
+                AxisDirection.NEGATIVE);
 
+        BlockPos pos = this.getBlockPos();
+        HologramSourceBlockEntity be = this;
 
+        while (true) {
+            pos = pos.relative(dir);
+            Optional<HologramSourceBlockEntity> opt = this.level.getBlockEntity(pos,
+                    COBlockEntities.HOLOGRAM_SOURCE.get());
+            if (!opt.isPresent())
+                break;
+            be = opt.get();
+            if (be.shouldBeController())
+                break;
 
-    public HologramSourceBlockEntity findController(){
-        AtomicReference<HologramSourceBlockEntity> newController = new AtomicReference<>(this);
-        onConnection(this.getBlockPos(), true, b -> b.ifPresent(newController::set));
-        return newController.get();
-    }
-
-
-
-
-    public void updateConnection(HologramSourceBlockEntity controller){
-        if(this.getLevel() != null && !getLevel().isClientSide){
-            this.isController = controller.getBlockPos() == this.getBlockPos();
-            this.setControllerPos(controller.getBlockPos());
-            if(this.isController){
-                this.setConnectionLength(calculateConnectionLength());
-
-            } else {
-                this.profile.update(controller.profile);
-            }
-            sendData();
         }
+        return be;
     }
-    @Override
-    public void tick() {
-        super.tick();
-        if(!this.level.isClientSide){
-            //this.isController = this.getControllerPos().equals(this.getBlockPos());
-            //this.sendData();
+
+    public @Nullable HologramSourceBlockEntity getController() {
+        if (this.isController()) {
+            return this;
         }
-        if(this.shouldUpdate()){
-            this.update();
+        if (this.controllerPos == null)
+            return null;
+        Optional<HologramSourceBlockEntity> opt = this.level.getBlockEntity(this.controllerPos,
+                COBlockEntities.HOLOGRAM_SOURCE.get());
+        if (opt.isPresent()) {
+            return opt.get();
+        } else {
+            return null;
         }
 
-
     }
 
-
-    public @Nullable HologramSourceBlockEntity getController(){
-        if(this.isController || ! (this.getBlockState().getBlock() instanceof HologramSourceBlock b)) return this;
-        return b.getBlockEntity(this.getLevel(), this.getControllerPos());
-
-    }
     @Override
     public AABB getRenderBoundingBox() {
-        if(!this.isController) return super.getRenderBoundingBox();
-        return getProjectionBox().inflate(0, 1, 0);
+        AABB aabb = getProjectionBox();
+        if (aabb != null)
+            return aabb.inflate(0, 1, 0);
+        return super.getRenderBoundingBox();
     }
 
-    public AABB getProjectionBox(){
-        Vec3 center = Vec3.atCenterOf(this.getBlockPos()).add(COUtils.getAbsVec(Vec3.atLowerCornerOf(this.getBlockState().getValue(HologramSourceBlock.FACING).getCounterClockWise().getNormal())).scale((this.getConnectionLength() - 1)/ 2D));
-        center = center.add(0,0.5 + this.getConnectionLength() / 2D,0);
-        return new AABB(center, center).inflate(getConnectionLength() / 2D);
+    public @Nullable AABB getProjectionBox() {
+        HologramSourceBlockEntity controller = this.getController();
+        if (controller == null || controller.profile == null)
+            return null;
+        int length = controller.profile.connectionLength;
+        Vec3 center = Vec3.atCenterOf(controller.getBlockPos())
+                .add(
+                        COUtils.getAbsVec(Vec3.atLowerCornerOf(
+                                Direction.fromAxisAndDirection(
+                                        HologramSourceBlock.getConnectionAxis(controller.getBlockState()),
+                                        AxisDirection.POSITIVE).getNormal()))
+                                .scale((length - 1) / 2D));
+        center = center.add(0, 0.5 + length / 2D, 0);
+        return new AABB(center, center).inflate(length / 2D);
     }
-    public boolean shouldUpdate(){
-        IBeamReceiver.BeamSourceInstance beamSourceInstance1 = this.beamSourceInstance;
-        this.beamSourceInstance = this.beamSourceInstance.checkSourceExistenceAndCompatibility(this);
-        return !beamSourceInstance1.equals(this.beamSourceInstance);
 
-    }
-
-    public void update(){
+    public void update() {
         this.setChanged();
+        this.sendData();
     }
 
-    public HologramSourceProfile getProfile() {
-        return profile;
+    public @Nullable HologramSourceProfile getProfile() {
+        return this.profile;
     }
 
-    public boolean changeState(BlockPos pos, BeamHelper.BeamProperties beamProperties){
-        if(this.beamSourceInstance.optionalBeamProperties().isEmpty()){
-            this.beamSourceInstance = new IBeamReceiver.BeamSourceInstance(Optional.of(beamProperties), pos);
-            update();
+    public void receiveBeam(BeamProperties prop, boolean onUpdate) {
+        if (this.optionalBeamProperties.isEmpty() || onUpdate) {
+            this.optionalBeamProperties = Optional.of(prop);
+            this.update();
         }
-        return beamProperties.equals(this.beamSourceInstance.optionalBeamProperties().orElse(null));
+    }
+
+    public void removeBeam() {
+        this.optionalBeamProperties = Optional.empty();
+        this.update();
     }
 
     public Optional<BeamHelper.BeamProperties> getOptionalBeamProperties() {
-        return this.beamSourceInstance.optionalBeamProperties();
+        return this.isController() ? this.optionalBeamProperties : this.getController().getOptionalBeamProperties();
     }
 
-
-    public boolean isActive(){
-        return this.getOptionalBeamProperties().isPresent();
-    }
-
-    @Override
-    public void addBehaviours(List<BlockEntityBehaviour> behaviours) {}
-
-    public Integer getConnectionLength(){
-        return this.profile.connectionLength;
-    }
-
-    public void setConnectionLength(Integer integer){
-        this.profile.connectionLength = integer;
-    }
-
-    public BlockPos getControllerPos(){
-        return this.profile.controllerPos;
-    }
-
-
-    public void setControllerPos(BlockPos pos){
-        this.profile.controllerPos = pos;
-    }
-
-
-    public int getFixedAngle() {
-        return this.profile.fixedAngle;
-    }
-
-    public void setFixedAngle(int fixedAngle) {
-        this.profile.fixedAngle = fixedAngle;
-    }
-
-    public void setItemStack(ItemStack itemStack) {
-        try {
-            HologramSourceBlockEntity controller = this.getController();
-            controller.profile.stack = itemStack;
-            controller.sendData();
-            controller.onConnection(controller.getBlockPos(), false, opBe -> opBe.ifPresent(be1 -> {
-                be1.profile.update(controller.profile);
-                be1.sendData();
-            }));
-
-        } catch (Exception ex){
-            System.out.println("Unable to send data to server in "+this.toString());
+    public boolean isActive() {
+        if (this.isController()) {
+            return this.getOptionalBeamProperties().isPresent();
+        } else {
+            return this.getController() != null && this.getController().isActive();
         }
     }
 
-    public ItemStack getItemStack() {
-        return this.profile.stack;
-    }
-    public Mode getMode() {
-        return this.profile.displayMode;
-    }
-
-    public void setMode(int mode) {
-        this.profile.displayMode = Mode.values()[Math.max(0, Math.min(Mode.values().length, mode))];
-    }
-
-    public CompoundTag getModeData(){
-        CompoundTag tag = new CompoundTag();
-        tag.putInt("ModeIndex", this.getMode().ordinal());
-        tag.putInt("Angle", this.getFixedAngle());
-        return tag;
+    @Override
+    public void addBehaviours(List<BlockEntityBehaviour> behaviours) {
     }
 
     @Override
-    protected void read(CompoundTag tag, boolean clientPacket) {
-
-        HologramSourceProfile.read(tag).ifPresent(hologramSourceProfile -> {
-            this.profile.update(hologramSourceProfile);
-            this.isController = hologramSourceProfile.controllerPos.equals(this.getBlockPos());
+    protected void read(CompoundTag tag, HolderLookup.Provider prov, boolean clientPacket) {
+        super.read(tag, prov, clientPacket);
+        this.optionalBeamProperties = BeamProperties.read(tag);
+        NbtUtils.readBlockPos(tag, "ControllerPos").ifPresent(a -> {
+            this.controllerPos = a;
         });
-        super.read(tag, clientPacket);
+        this.profile = HologramSourceProfile.read(tag, prov);
     }
 
-
     @Override
-    protected void write(CompoundTag tag, boolean clientPacket) {
+    protected void write(CompoundTag tag, HolderLookup.Provider prov, boolean clientPacket) {
+        super.write(tag, prov, clientPacket);
+        this.optionalBeamProperties.ifPresent(prop -> {
+            prop.write(tag);
+        });
+        if (this.controllerPos != null)
+            tag.put("ControllerPos", NbtUtils.writeBlockPos(this.controllerPos));
+        if (this.profile != null)
+            this.getProfile().write(tag, prov);
 
-        this.profile.write(tag);
-        super.write(tag, clientPacket);
     }
 
     public static class HologramSourceProfile {
 
-        public BlockPos controllerPos;
-        public Integer connectionLength = 1;
-        public ItemStack stack = ItemStack.EMPTY;
+        private int connectionLength = 1;
+        public int fixedAngle = 0;
+        public int angleVelocity = 45;
         public Mode displayMode = Mode.ROTATING_COUNTERCLOCKWISE;
-        public Integer fixedAngle = 0;
+        public ItemStack stack = ItemStack.EMPTY;
+        private List<String> messages = new ArrayList<>();
 
-
-
-        public HologramSourceProfile(BlockPos controllerPos){
-            this.controllerPos = controllerPos;
-        }
-        public HologramSourceProfile update(HologramSourceProfile profile) {
-            return this.update(profile.controllerPos, profile.connectionLength, profile.stack, profile.displayMode, profile.fixedAngle);
+        public HologramSourceProfile() {
+            this.updateSections();
         }
 
-        public HologramSourceProfile update(BlockPos controllerPos, Integer connectionLength, ItemStack stack, Mode displayMode, Integer fixedAngle) {
-            this.controllerPos = controllerPos;
-            this.connectionLength = connectionLength;
+        public HologramSourceProfile(int length, int angle, int mode, int angleVelocity) {
+            this.connectionLength = length;
+            this.fixedAngle = angle;
+            this.angleVelocity = angleVelocity;
+            this.displayMode = Mode.values()[mode % Mode.values().length]; // ciclic
+            this.updateSections();
+        }
+
+        public int getConnectionLength() {
+            return connectionLength;
+        }
+
+        public int getFixedAngle() {
+            return fixedAngle;
+        }
+
+        public int getAngleVelocity() {
+            return this.angleVelocity;
+        }
+
+        public Mode getDisplayMode() {
+            return displayMode;
+        }
+
+        public List<String> getMessages() {
+            return messages;
+        }
+
+        public boolean hasMessages() {
+            return this.messages.stream()
+                    .anyMatch(s -> s != null && !s.isEmpty());
+
+        }
+
+        public void setItemStack(ItemStack stack) {
             this.stack = stack;
-            this.displayMode = displayMode;
-            this.fixedAngle = fixedAngle;
-            return this;
         }
 
+        public void setConnectionLength(int connectionLength) {
+            this.connectionLength = connectionLength;
+            this.updateSections();
+        }
 
-        public void write(CompoundTag tag){
-            ListTag profile = new ListTag();
-            ListTag intTags = new ListTag();
-            ListTag compoundTags = new ListTag();
-            intTags.add(IntTag.valueOf(this.connectionLength));
-            compoundTags.add(this.stack.save(new CompoundTag()));
-            CompoundTag tagEnum = new CompoundTag();
-            NBTHelper.writeEnum(tagEnum, "DisplayMode", this.displayMode);
-            compoundTags.add(tagEnum);
-            intTags.add(IntTag.valueOf(this.fixedAngle));
-            profile.add(NBTHelper.writeVec3i(this.controllerPos));
-            profile.add(intTags);
-            profile.add(compoundTags);
+        public int getRowsCount() {
+            return Math.min(5, 1 + connectionLength);
+        }
+
+        private void updateSections() {
+
+            int mS = Math.min(5, this.messages.size());
+            int mR = Math.min(5, this.getRowsCount());
+
+            if (mS != mR) {
+                List<String> sections = new ArrayList<>(
+                        Collections.nCopies(this.getRowsCount(), new String()));
+                for (int i = 0; i < Math.min(mS, mR); i++) {
+                    sections.set(i, this.messages.get(i));
+                }
+                this.messages = sections;
+            }
+
+        }
+
+        public void addSection(int i, String section) {
+            this.updateSections();
+            if (i < this.messages.size())
+                this.messages.set(i, section);
+        }
+
+        public void write(CompoundTag tag, HolderLookup.Provider prov) {
+            CompoundTag profile = new CompoundTag();
+            profile.putInt("Length", this.connectionLength);
+            profile.putInt("Angle", this.fixedAngle);
+            profile.putInt("DisplayMode", this.displayMode.ordinal());
+            profile.putInt("AngleVelocity", this.angleVelocity);
+            profile.putInt("AngleVelocity", this.angleVelocity);
+            profile.put("Messages", NBTHelper.writeCompoundList(this.messages, s -> {
+                CompoundTag t = new CompoundTag();
+                t.putString("String", s);
+                return t;
+            }));
+            profile.put("Stack", this.stack.saveOptional(prov));
+
             tag.put("Profile", profile);
         }
-        public static Optional<HologramSourceProfile> read(CompoundTag tag){
+
+        public static @Nullable HologramSourceProfile read(CompoundTag tag, HolderLookup.Provider prov) {
             HologramSourceProfile profile = null;
-            if(tag.contains("Profile")){
-                ListTag profileTag  = (ListTag) tag.get("Profile");
-                try{
-                    ListTag ints = profileTag.getList(1);
-                    ListTag compounds = profileTag.getList(2);
-                    profile = new HologramSourceProfile(BlockPos.ZERO).update(
-                            new BlockPos(NBTHelper.readVec3i(profileTag.getList(0))), ints.getInt(0),
-                            ItemStack.of(compounds.getCompound(0)), NBTHelper.readEnum(compounds.getCompound(1), "DisplayMode", Mode.class),
-                            ints.getInt(1)
-                    );
-                } catch (Exception e) {
-                    System.out.println("Unable to load data from tag. ");
-                    System.out.println(e.getLocalizedMessage());
+            if (tag.contains("Profile")) {
+                CompoundTag profileTag = tag.getCompound("Profile");
+                try {
+                    profile = new HologramSourceProfile(
+                            profileTag.getInt("Length"),
+                            profileTag.getInt("Angle"),
+                            profileTag.getInt("DisplayMode"),
+                            profileTag.getInt("AngleVelocity"));
+                    if (profileTag.contains("Messages")) {
+                        List<String> sections = NBTHelper.readCompoundList(
+                                profileTag.getList("Messages", Tag.TAG_COMPOUND), t -> t.getString("String"));
+                        for (int i = 0; i < sections.size(); i++) {
+                            profile.addSection(i, sections.get(i));
+                        }
+                    }
+                    profile.stack = ItemStack.parseOptional(prov, profileTag.getCompound("Stack"));
+                } catch (Exception ex) {
+                    CreateOptical.LOGGER.info("Unable to read HologramSourceProfile");
                 }
             }
-            return Optional.ofNullable(profile);
+            return profile;
         }
     }
 
-    public boolean hasFixedAngle(){
+    public boolean hasFixedAngle() {
         return this.profile.displayMode.shouldRenderAngle;
     }
 
     public enum Mode {
         ROTATING_COUNTERCLOCKWISE("counterclockwise", false),
         ROTATING_CLOCKWISE("clockwise", false),
-        SPECIFIC_ANGLE("specific_angle", true)
-        ;
+        SPECIFIC_ANGLE("specific_angle", true);
+
         final String translationKey;
         final boolean shouldRenderAngle;
-        Mode(String name, boolean shouldRenderAngle){
+
+        Mode(String name, boolean shouldRenderAngle) {
             this.translationKey = "gui.hologram_source.mode_" + name;
             this.shouldRenderAngle = shouldRenderAngle;
         }
-        public String getTranslationKey(){
+
+        public String getTranslationKey() {
             return this.translationKey;
         }
 
@@ -351,13 +407,47 @@ public class HologramSourceBlockEntity extends SmartBlockEntity implements IHave
             return shouldRenderAngle;
         }
 
-        public static List<Component> getComponents(){
+        public static List<Component> getComponents() {
             List<Component> components = new ArrayList<>();
-            for(Mode mode: Mode.values()){
-                components.add( COLang.Prefixes.OPTICAL.translate((mode.getTranslationKey())));
+            for (Mode mode : Mode.values()) {
+                components.add(COLang.Prefixes.OPTICAL.translate((mode.getTranslationKey())));
             }
             return components;
         }
     }
 
+    public record DisplaySection(List<MutableComponent> line) {
+        public DisplaySection() {
+            this(new ArrayList<>());
+        }
+
+        public String getText() {
+            String s = "";
+            for (MutableComponent c : this.line()) {
+                s = s.concat(c.getString());
+            }
+            return s;
+        }
+
+        public void write(CompoundTag tag, HolderLookup.Provider prov) {
+            tag.put("DisplaySection",
+                    NBTHelper.writeCompoundList(this.line(), component -> {
+                        CompoundTag c = new CompoundTag();
+                        c.putString("Element", Component.Serializer.toJson(component, prov));
+                        return c;
+                    }));
+        }
+
+        public static DisplaySection read(CompoundTag tag, HolderLookup.Provider prov) {
+            ArrayList<MutableComponent> components = new ArrayList<>();
+            if (tag.contains("DisplaySection")) {
+                ListTag list = tag.getList("DisplaySection", Tag.TAG_COMPOUND);
+                components.addAll(NBTHelper.readCompoundList(list, compound -> {
+                    return Component.Serializer.fromJson(compound.getString("Element"), RegistryAccess.EMPTY);
+                }));
+            }
+            return new DisplaySection(components);
+        }
+
+    }
 }

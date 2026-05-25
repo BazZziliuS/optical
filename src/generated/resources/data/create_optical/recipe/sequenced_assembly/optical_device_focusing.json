@@ -1,0 +1,63 @@
+{
+  "type": "create:sequenced_assembly",
+  "ingredient": {
+    "item": "create:iron_sheet"
+  },
+  "results": [
+    {
+      "chance": 100.0,
+      "id": "create_optical:optical_device"
+    }
+  ],
+  "sequence": [
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        {
+          "item": "create_optical:incomplete_optical_device"
+        },
+        {
+          "item": "minecraft:amethyst_shard"
+        }
+      ],
+      "results": [
+        {
+          "id": "create_optical:incomplete_optical_device"
+        }
+      ]
+    },
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        {
+          "item": "create_optical:incomplete_optical_device"
+        },
+        {
+          "item": "minecraft:glass_pane"
+        }
+      ],
+      "results": [
+        {
+          "id": "create_optical:incomplete_optical_device"
+        }
+      ]
+    },
+    {
+      "type": "create_optical:focusing",
+      "ingredients": [
+        {
+          "item": "create_optical:incomplete_optical_device"
+        }
+      ],
+      "mode": 3,
+      "results": [
+        {
+          "id": "create_optical:incomplete_optical_device"
+        }
+      ]
+    }
+  ],
+  "transitional_item": {
+    "id": "create_optical:incomplete_optical_device"
+  }
+}

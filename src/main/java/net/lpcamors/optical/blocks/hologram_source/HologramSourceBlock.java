@@ -1,219 +1,355 @@
 package net.lpcamors.optical.blocks.hologram_source;
 
+import java.util.function.Function;
+import java.util.function.Predicate;
+
+import com.mojang.serialization.MapCodec;
 import com.simibubi.create.AllItems;
 import com.simibubi.create.content.equipment.wrench.IWrenchable;
-import com.simibubi.create.content.kinetics.transmission.sequencer.SequencedGearshiftBlockEntity;
-import com.simibubi.create.content.kinetics.transmission.sequencer.SequencedGearshiftScreen;
+import com.simibubi.create.content.kinetics.base.KineticBlockEntity;
 import com.simibubi.create.foundation.block.IBE;
 import com.simibubi.create.foundation.data.AssetLookup;
-import com.simibubi.create.foundation.gui.ScreenOpener;
+import com.simibubi.create.foundation.placement.PoleHelper;
 import com.tterrag.registrate.providers.DataGenContext;
 import com.tterrag.registrate.providers.RegistrateBlockstateProvider;
+
+import org.jetbrains.annotations.NotNull;
+
+import net.createmod.catnip.gui.ScreenOpener;
+import net.createmod.catnip.placement.IPlacementHelper;
+import net.createmod.catnip.placement.PlacementHelpers;
+import net.createmod.catnip.placement.PlacementOffset;
+import net.createmod.catnip.platform.CatnipServices;
 import net.lpcamors.optical.COShapes;
-import net.lpcamors.optical.COUtils;
 import net.lpcamors.optical.blocks.COBlockEntities;
-import net.lpcamors.optical.blocks.IBeamReceiver;
-import net.lpcamors.optical.blocks.IBeamSource;
-import net.lpcamors.optical.blocks.optical_source.BeamHelper;
+import net.lpcamors.optical.blocks.COBlocks;
+import net.lpcamors.optical.blocks.optical_source.BeamHelper.BeamProperties;
+import net.lpcamors.optical.blocks.optical_source.GenericOpticalSourceBlockEntity;
+import net.lpcamors.optical.blocks.optical_source.GenericOpticalSourceBlockEntity.IBeamActivator;
 import net.lpcamors.optical.gui.HologramSourceScreen;
+import net.minecraft.MethodsReturnNonnullByDefault;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.Direction.Axis;
+import net.minecraft.core.Direction.AxisDirection;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
+import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.StateDefinition.Builder;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.block.state.properties.Property;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.client.model.generators.ModelFile;
-import net.minecraftforge.fml.DistExecutor;
-import org.jetbrains.annotations.NotNull;
+import net.minecraft.world.ticks.LevelTickAccess;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Function;
+public class HologramSourceBlock extends Block
+        implements IBeamActivator, IWrenchable, IBE<HologramSourceBlockEntity> {
 
-public class HologramSourceBlock extends HorizontalDirectionalBlock implements IBeamReceiver, IWrenchable, IBE<HologramSourceBlockEntity> {
+    public static final MapCodec<HologramSourceBlock> CODEC = simpleCodec(HologramSourceBlock::new);
 
-    public static final BooleanProperty CONNECTED_POSITIVE = BooleanProperty.create("positive_connection");
-    public static final BooleanProperty CONNECTED_NEGATIVE = BooleanProperty.create("negative_connection");
+    public static final Property<Axis> HORIZONTAL_AXIS = BlockStateProperties.HORIZONTAL_AXIS;
+    public static final BooleanProperty RIGHT = BooleanProperty.create("positive_connection");
+    public static final BooleanProperty LEFT = BooleanProperty.create("negative_connection");
 
     public HologramSourceBlock(Properties properties) {
         super(properties);
-        registerDefaultState(defaultBlockState().setValue(CONNECTED_POSITIVE, Boolean.FALSE));
-        registerDefaultState(defaultBlockState().setValue(CONNECTED_NEGATIVE, Boolean.FALSE));
-    }
-
-
-    @Override
-    public boolean useCenteredIncidence() {
-        return false;
+        registerDefaultState(defaultBlockState()
+                .setValue(RIGHT, false)
+                .setValue(LEFT, false));
     }
 
     @Override
-    public BlockState updateAfterWrenched(BlockState newState, UseOnContext context) {
-        return updateStateConnections(IWrenchable.super.updateAfterWrenched(newState, context), context.getLevel(), context.getClickedPos());
+    protected void createBlockStateDefinition(Builder<Block, BlockState> builder) {
+        super.createBlockStateDefinition(builder.add(RIGHT, LEFT, HORIZONTAL_AXIS));
     }
 
     @Override
-    public void receive(IBeamSource iBeamSource, BlockState state, BlockPos lastPos, BeamHelper.BeamProperties beamProperties, int lastIndex) {
-        Direction direction = beamProperties.direction;
-        HologramSourceBlockEntity be = this.getBlockEntity(iBeamSource.getLevel(), lastPos);
-        if(!beamProperties.getType().equals(BeamHelper.BeamType.VISIBLE) || be == null || state.getValue(FACING).getAxis().equals(direction.getAxis())) return;
-
-        BlockPos pos = be.getBlockPos();
-        if(be.changeState(iBeamSource.getBlockPos(), beamProperties)){
-            iBeamSource.addDependent(pos);
-            IBeamSource.propagateLinearBeamVar(iBeamSource, lastPos, beamProperties, lastIndex);
-
-        }
+    public @NotNull VoxelShape getShape(BlockState p_60555_, @NotNull BlockGetter p_60556_, @NotNull BlockPos p_60557_,
+            @NotNull CollisionContext p_60558_) {
+        return COShapes.HOLOGRAM_SOURCE.get(p_60555_.getValue(HORIZONTAL_AXIS));
     }
 
-    @Override
-    public void onRemove(BlockState state, Level world, BlockPos pos, BlockState newState, boolean p_60519_) {
-        super.onRemove(state, world, pos, newState, p_60519_);
-        if (world.isClientSide)
-            return;
-        world.removeBlockEntity(pos);
-        updateNeighbourConnections(state, world, pos, true);
-    }
-
-    @Override
-    public void neighborChanged(BlockState state, Level level, BlockPos pos, Block block, BlockPos otherPos, boolean p_60514_) {
-        super.neighborChanged(state, level, pos, block, otherPos, p_60514_);
-        if (level.isClientSide)
-            return;
-        //updateNeighbourConnections(state, level, pos);
-    }
-
-    @Override
-    public void onPlace(@NotNull BlockState state, @NotNull Level world, @NotNull BlockPos pos, @NotNull BlockState oldState, boolean isMoving) {
-        super.onPlace(state, world, pos, oldState, isMoving);
-        if (world.isClientSide)
-            return;
-        updateNeighbourConnections(state, world, pos, false);
-
-    }
-
-    @Override
-    public @NotNull VoxelShape getShape(BlockState p_60555_, @NotNull BlockGetter p_60556_, @NotNull BlockPos p_60557_, @NotNull CollisionContext p_60558_) {
-        return (COShapes.HOLOGRAM_SOURCE).get(p_60555_.getValue(FACING));
-    }
-    @Override
-    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> p_49915_) {
-        super.createBlockStateDefinition(p_49915_.add(FACING).add(CONNECTED_POSITIVE).add(CONNECTED_NEGATIVE));
-    }
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
-        BlockState state = super.getStateForPlacement(context).setValue(FACING, context.getHorizontalDirection().getOpposite());
-        return updateStateConnections(state, context.getLevel(), context.getClickedPos());
-
+        return updateLine(super.getStateForPlacement(context).setValue(HORIZONTAL_AXIS,
+                context.getHorizontalDirection().getAxis()), context.getClickedPos(),
+                context.getLevel());
     }
 
     @Override
-    public @NotNull InteractionResult use(@NotNull BlockState state, @NotNull Level level, @NotNull BlockPos pos, @NotNull Player player,
-                                          @NotNull InteractionHand interactionHand, @NotNull BlockHitResult blockHitResult) {
-        if(player.isShiftKeyDown()) return InteractionResult.PASS;
-
-
-        ItemStack stack = player.getItemInHand(interactionHand);
-
-        if(!stack.isEmpty()){
-            HologramSourceBlockEntity be = getBlockEntity(level, pos);
-            if(be == null) return InteractionResult.PASS;
-            if(stack.is(AllItems.WRENCH.asItem())) return super.use(state, level, pos, player, interactionHand, blockHitResult);
-            be = be.getController();
-            if(be == null) return InteractionResult.PASS;
-            be.setItemStack(stack.copy());
-            return InteractionResult.SUCCESS;
+    public void onPlace(BlockState pState, Level pLevel, BlockPos pPos, BlockState pOldState, boolean pIsMoving) {
+        super.onPlace(pState, pLevel, pPos, pOldState, pIsMoving);
+        if (pOldState.getBlock() == this)
+            return;
+        LevelTickAccess<Block> blockTicks = pLevel.getBlockTicks();
+        if (!blockTicks.hasScheduledTick(pPos, this)) {
+            pLevel.scheduleTick(pPos, this, 1);
         }
 
-        DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
-                () -> () -> withBlockEntityDo(level, pos, be -> this.displayScreen(be, player)));
-        return InteractionResult.SUCCESS;
+        BlockPos adjacentPos = pPos.relative(getConnectionAxis(pState), 1);
+        BlockState state = pLevel.getBlockState(adjacentPos);
+        if (state.getBlock() instanceof HologramSourceBlock b) {
+            b.update(state, pLevel, adjacentPos);
+        }
+
+        adjacentPos = pPos.relative(getConnectionAxis(pState), -1);
+        state = pLevel.getBlockState(adjacentPos);
+        if (state.getBlock() instanceof HologramSourceBlock b) {
+            b.update(state, pLevel, adjacentPos);
+        }
+    }
+
+    @Override
+    protected void onRemove(BlockState pState, Level pLevel, BlockPos pPos, BlockState newState,
+            boolean movedByPiston) {
+        super.onRemove(pState, pLevel, pPos, newState, movedByPiston);
+        LevelTickAccess<Block> blockTicks = pLevel.getBlockTicks();
+        if (!blockTicks.hasScheduledTick(pPos, this)) {
+            pLevel.scheduleTick(pPos, this, 1);
+        }
+
+        BlockPos adjacentPos = pPos.relative(getConnectionAxis(pState), 1);
+        BlockState state = pLevel.getBlockState(adjacentPos);
+        if (state.getBlock() instanceof HologramSourceBlock b) {
+            b.update(state, pLevel, adjacentPos);
+        }
+
+        adjacentPos = pPos.relative(getConnectionAxis(pState), -1);
+        state = pLevel.getBlockState(adjacentPos);
+        if (state.getBlock() instanceof HologramSourceBlock b) {
+            b.update(state, pLevel, adjacentPos);
+        }
+    }
+
+    protected boolean canConnect(BlockState state, BlockState other) {
+        return other.getBlock() == this && state.getValue(HORIZONTAL_AXIS).equals(other.getValue(HORIZONTAL_AXIS));
+    }
+
+    public static Axis getConnectionAxis(BlockState state) {
+        return Direction.fromAxisAndDirection(state.getValue(HORIZONTAL_AXIS), AxisDirection.POSITIVE).getClockWise()
+                .getAxis();
+    }
+
+    public static BlockState setConnection(BlockState state, boolean connectRight, boolean connectLeft) {
+        return state.setValue(RIGHT, connectRight).setValue(LEFT, connectLeft);
+    }
+
+    public static boolean getConnection(BlockState state, boolean left) {
+        if (!(state.getBlock() instanceof HologramSourceBlock))
+            return false;
+        return state.getValue(left ? LEFT : RIGHT);
+    }
+
+    @Override
+    public void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource pRandom) {
+        super.tick(state, level, pos, pRandom);
+        if (state.getBlock() != this)
+            return;
+        update(state, level, pos);
+        level.getBlockEntity(pos, this.getBlockEntityType()).ifPresent(be -> {
+            be.findController().updateChain();
+        });
+
+    }
+
+    private void update(BlockState state, Level level, BlockPos pos) {
+        if (level.isClientSide())
+            return;
+        boolean f1 = getConnection(state, false) != canConnect(state,
+                level.getBlockState(pos.relative(getConnectionAxis(state), 1)));
+        boolean f2 = getConnection(state, true) != canConnect(state,
+                level.getBlockState(pos.relative(getConnectionAxis(state), -1)));
+        if (f1 || f2) {
+
+            KineticBlockEntity.switchToBlockState(level, pos, updateLine(state, pos,
+                    level));
+        }
+    }
+
+    private BlockState updateLine(BlockState state, BlockPos pos, Level level) {
+        Axis axis = getConnectionAxis(state);
+
+        if (!level.isLoaded(pos))
+            return state;
+        Direction direction = axis.equals(Axis.Z) ? Direction.SOUTH : Direction.EAST;
+        BlockState stateL = level.getBlockState(pos.relative(direction));
+        BlockState stateR = level.getBlockState(pos.relative(direction.getOpposite()));
+
+        boolean canConnectRight = canConnect(state, stateR),
+                canConnectLeft = canConnect(state, stateL);
+
+        state = setConnection(state, canConnectRight, canConnectLeft);
+
+        return state;
     }
 
     @Override
     public Class<HologramSourceBlockEntity> getBlockEntityClass() {
         return HologramSourceBlockEntity.class;
     }
+
     @Override
     public BlockEntityType<? extends HologramSourceBlockEntity> getBlockEntityType() {
         return COBlockEntities.HOLOGRAM_SOURCE.get();
     }
-    public static BlockState updateStateConnections(BlockState state, BlockGetter level, BlockPos pos){
-        boolean f1 = canConnect(state, level.getBlockState(pos.relative(Direction.fromAxisAndDirection(getConnectionAxis(state), Direction.AxisDirection.POSITIVE))));
-        boolean f2 = canConnect(state, level.getBlockState(pos.relative(Direction.fromAxisAndDirection(getConnectionAxis(state), Direction.AxisDirection.NEGATIVE))));
-        Direction direction = state.getValue(FACING);
-        boolean f = direction.equals(Direction.EAST) || direction.equals(Direction.NORTH);
-        BlockState state1 = state.setValue(f ? CONNECTED_NEGATIVE : CONNECTED_POSITIVE, f1);
-        state1 = state1.setValue(f ? CONNECTED_POSITIVE : CONNECTED_NEGATIVE, f2);
-        return state1;
-    }
-    protected static boolean canConnect(BlockState state, BlockState other) {
-        return other.getBlock() instanceof HologramSourceBlock && state.getValue(FACING).getAxis() == other.getValue(FACING).getAxis();
-    }
 
-    protected static Optional<HologramSourceBlockEntity> getConnection(BlockState state, BlockPos pos, Level level, Direction.AxisDirection axisDirection){
-        if(getConnectionAxis(state).isVertical()) return Optional.empty();
-        Optional<HologramSourceBlockEntity> op = Optional.ofNullable(COUtils.getBlockEntity(level, pos.relative(Direction.fromAxisAndDirection(getConnectionAxis(state), axisDirection)), HologramSourceBlockEntity.class));
-        if(op.isPresent()) op = getConnectionAxis(op.get().getBlockState()).equals(getConnectionAxis(state)) ? op : Optional.empty();
-        return op;
-    }
-    protected static Direction.Axis getConnectionAxis(BlockState state){
-        return state.getValue(FACING).getCounterClockWise().getAxis();
-    }
-    public static void updateNeighbourConnections(@NotNull BlockState state, @NotNull Level level, @NotNull BlockPos pos, boolean onRemove){
-
-        List<HologramSourceBlockEntity> bes =new ArrayList<>();
-        getConnection(state, pos, level, Direction.AxisDirection.POSITIVE).ifPresent(be -> {
-            level.setBlock(be.getBlockPos(), HologramSourceBlock.updateStateConnections(be.getBlockState(), level, be.getBlockPos()), 3);
-            bes.add(be);
-        });
-        getConnection(state, pos, level, Direction.AxisDirection.NEGATIVE).ifPresent(be -> {
-            level.setBlock(be.getBlockPos(), HologramSourceBlock.updateStateConnections(be.getBlockState(), level, be.getBlockPos()), 3);
-            bes.add(be);
-        });
-        if(!bes.isEmpty()) {
-            if(onRemove) {
-                bes.forEach(HologramSourceBlockEntity::onAdded);
-            } else {
-                ((HologramSourceBlock)state.getBlock()).getBlockEntity(level, pos).onAdded();
-            }
-
-
+    @Override
+    public BeamProperties transformProperties(Level level, BlockState state, BlockPos pos, BeamProperties prop,
+            GenericOpticalSourceBlockEntity source, int range) {
+        if (prop.direction().getAxis() == getConnectionAxis(state)) {
+            return prop;
         }
+        return null;
+    }
+
+    @Override
+    public boolean canReceive(Level level, BlockState state, BlockPos pos, BeamProperties prop) {
+        return prop.direction().getAxis() == getConnectionAxis(state);
+    }
+
+    @Override
+    public void onReceiveBeam(Level level, BlockState state, BlockPos pos, BeamProperties prop) {
+        level.getBlockEntity(pos, this.getBlockEntityType()).ifPresent(be -> {
+            be.receiveBeam(prop, false);
+        });
+
+    }
+
+    @Override
+    public void onUpdateBeam(Level level, BlockState state, BlockPos pos, BeamProperties prop) {
+        if (!this.canReceive(level, state, pos, prop))
+            return;
+        level.getBlockEntity(pos, this.getBlockEntityType()).ifPresent(be -> {
+            be.receiveBeam(prop, true);
+        });
+    }
+
+    @Override
+    public void onRemoveBeam(Level level, BlockState state, BlockPos pos, BeamProperties prop) {
+        level.getBlockEntity(pos, this.getBlockEntityType()).ifPresent(be -> {
+            be.removeBeam();
+        });
+    }
+
+    @Override
+    public AABB getNonVisibleAABB(Level level, BlockState state, BlockPos pos) {
+        return null;
+    }
+
+    @Override
+    protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos,
+            Player player, InteractionHand interactionHand, BlockHitResult hitResult) {
+        if (!player.mayBuild())
+            return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+        boolean f = player.isShiftKeyDown();
+        IPlacementHelper helper = PlacementHelpers.get(placementHelperId);
+        if (helper.matchesItem(stack) && !f)
+            return helper.getOffset(player, level, state, pos, hitResult)
+                    .placeInWorld(level, (BlockItem) stack.getItem(), player, interactionHand, hitResult);
+
+        if (!f && stack.isEmpty()) {
+            if (player.level().isClientSide) {
+                level.getBlockEntity(pos, this.getBlockEntityType()).ifPresent(be -> {
+                    CompoundTag tag = new CompoundTag();
+                    be.write(tag, level.registryAccess(), true);
+                });
+                CatnipServices.PLATFORM.executeOnClientOnly(() -> () -> {
+                    this.displayScreen(player, level, pos);
+                });
+
+                return ItemInteractionResult.SUCCESS;
+            }
+        }
+
+        HologramSourceBlockEntity be = getBlockEntity(level, pos);
+        if (be == null)
+            return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+        be = be.getController();
+        if (be == null || be.getProfile() == null)
+            return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+
+        if (!level.isClientSide) {
+            if (!stack.isEmpty()) {
+                if (!stack.is(AllItems.WRENCH)) {
+                    be.getProfile().setItemStack(stack.copy());
+                    be.update();
+                }
+            } else if (f) {
+                be.getProfile().setItemStack(ItemStack.EMPTY);
+                be.update();
+            } 
+        }
+
+        return ItemInteractionResult.SUCCESS;
     }
 
     @OnlyIn(value = Dist.CLIENT)
-    protected void displayScreen(HologramSourceBlockEntity be, Player player) {
-        if (player instanceof LocalPlayer)
-            ScreenOpener.open(new HologramSourceScreen(be));
+    protected void displayScreen(Player player, Level level, BlockPos pos) {
+        if (player instanceof LocalPlayer) {
+            HologramSourceBlockEntity be = this.getBlockEntity(level, pos);
+            if (be.getController() != null && be.getController().getProfile() != null)
+                ScreenOpener.open(new HologramSourceScreen(be.getController()));
+        }
     }
 
-
-    public static <T extends Block> Function<BlockState, ModelFile> getBlockModel(DataGenContext<Block, T> c, RegistrateBlockstateProvider p) {
+    public static <T extends Block> Function<BlockState, net.neoforged.neoforge.client.model.generators.ModelFile> getBlockModel(
+            DataGenContext<Block, T> c, RegistrateBlockstateProvider p) {
         return state -> AssetLookup.partialBaseModel(c, p, getNameForState(state));
     }
-    private static String getNameForState(BlockState state){
-        boolean f1 = state.getValue(CONNECTED_POSITIVE);
-        boolean f2 = state.getValue(CONNECTED_NEGATIVE);
-        return f1 && f2 ? "connected" : f1 ? "connected_positive" : f2  ? "connected_negative" : "not_connected";
+
+    private static String getNameForState(BlockState state) {
+        boolean f1 = state.getValue(RIGHT),
+                f2 = state.getValue(LEFT);
+        return f1 && f2 ? "connected" : f1 ? "connected_positive" : f2 ? "connected_negative" : "not_connected";
+    }
+
+    public static final int placementHelperId = PlacementHelpers.register(new PlacementHelper());
+
+    @MethodsReturnNonnullByDefault
+    private static class PlacementHelper extends PoleHelper<Direction.Axis> {
+
+        public PlacementHelper() {
+            super(state -> state.getBlock() instanceof HologramSourceBlock,
+                    state -> Direction.fromAxisAndDirection(state.getValue(HORIZONTAL_AXIS), AxisDirection.POSITIVE)
+                            .getClockWise().getAxis(),
+                    HORIZONTAL_AXIS);
+        }
+
+        @Override
+        public Predicate<ItemStack> getItemPredicate() {
+            return COBlocks.HOLOGRAM_SOURCE::isIn;
+        }
+
+        @Override
+        public Predicate<BlockState> getStatePredicate() {
+            return COBlocks.HOLOGRAM_SOURCE::has;
+        }
+
+        @Override
+        public PlacementOffset getOffset(Player player, Level world, BlockState state, BlockPos pos,
+                BlockHitResult ray) {
+            PlacementOffset offset = super.getOffset(player, world, state, pos, ray);
+            if (offset.isSuccessful())
+                offset.withTransform(offset.getTransform());
+            return offset;
+        }
     }
 
 }

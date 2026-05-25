@@ -1,13 +1,20 @@
 package net.lpcamors.optical.items;
 
 import com.simibubi.create.content.processing.sequenced.SequencedAssemblyItem;
+import com.tterrag.registrate.builders.ItemBuilder;
 import com.tterrag.registrate.util.entry.ItemEntry;
-import net.lpcamors.optical.COMod;
+
+import net.lpcamors.optical.COCreativeModeTabs;
+import net.lpcamors.optical.CreateOptical;
 import net.minecraft.world.item.Item;
 
 
 public class COItems {
 
+    
+	static {
+		CreateOptical.REGISTRATE.setCreativeTab(COCreativeModeTabs.CO_BASE_CREATIVE_TAB);
+	}
 
     public static final ItemEntry<SequencedAssemblyItem>
             INCOMPLETE_OPTICAL_DEVICE = sequencedIngredient("incomplete_optical_device"),
@@ -27,12 +34,14 @@ public class COItems {
             MIRROR = ingredient("mirror"),
             POLARIZING_FILTER = ingredient("polarizing_filter");
 
+        
     private static ItemEntry<Item> ingredient(String name) {
-        return COMod.REGISTRATE.item(name, Item::new)
-                .register();
+        ItemBuilder<Item, ?> builder = CreateOptical.REGISTRATE.item(name, Item::new);
+        builder.build();
+        return builder.register();
     }
     private static ItemEntry<SequencedAssemblyItem> sequencedIngredient(String name) {
-        return COMod.REGISTRATE.item(name, SequencedAssemblyItem::new)
+        return CreateOptical.REGISTRATE.item(name, SequencedAssemblyItem::new)
                 .register();
     }
 

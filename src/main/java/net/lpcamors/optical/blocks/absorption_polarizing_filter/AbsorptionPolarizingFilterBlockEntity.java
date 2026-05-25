@@ -1,11 +1,10 @@
 package net.lpcamors.optical.blocks.absorption_polarizing_filter;
 
-import com.simibubi.create.content.equipment.goggles.IHaveGoggleInformation;
+import com.simibubi.create.api.equipment.goggles.IHaveGoggleInformation;
 import com.simibubi.create.foundation.blockEntity.SmartBlockEntity;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
-import com.simibubi.create.foundation.utility.Components;
-import com.simibubi.create.foundation.utility.Lang;
-import net.lpcamors.optical.COMod;
+import com.simibubi.create.foundation.utility.CreateLang;
+import net.lpcamors.optical.CreateOptical;
 import net.lpcamors.optical.blocks.optical_source.BeamHelper;
 import net.lpcamors.optical.data.COLang;
 import net.minecraft.ChatFormatting;
@@ -21,7 +20,8 @@ import java.util.List;
 
 public class AbsorptionPolarizingFilterBlockEntity extends SmartBlockEntity implements IHaveGoggleInformation {
 
-    public AbsorptionPolarizingFilterBlockEntity(BlockEntityType<?> p_155228_, BlockPos p_155229_, BlockState p_155230_) {
+    public AbsorptionPolarizingFilterBlockEntity(BlockEntityType<?> p_155228_, BlockPos p_155229_,
+            BlockState p_155230_) {
         super(p_155228_, p_155229_, p_155230_);
     }
 
@@ -34,16 +34,24 @@ public class AbsorptionPolarizingFilterBlockEntity extends SmartBlockEntity impl
     public boolean addToGoggleTooltip(List<Component> tooltip, boolean isPlayerSneaking) {
         Minecraft mc = Minecraft.getInstance();
         Direction direction = ((BlockHitResult) mc.hitResult).getDirection();
-        Direction blockDirection = this.getBlockState().getValue(AbsorptionPolarizingFilter.FACING).getClockWise();
+        Direction blockDirection = this.getBlockState().getValue(AbsorptionPolarizingFilterBlock.FACING).getClockWise();
         if (direction.getAxis().equals(blockDirection.getAxis())) {
-            Lang.builder("tooltip").translate(COMod.ID + ".gui.goggles.absorption_polarizing_filter").forGoggles(tooltip);
-            BeamHelper.BeamPolarization beamPolarization = this.getBlockState().getValue(AbsorptionPolarizingFilter.POLARIZATION);
+
+            CreateLang.builder("tooltip").translate(CreateOptical.ID + ".gui.goggles.absorption_polarizing_filter")
+                    .forGoggles(tooltip);
+            BeamHelper.BeamPolarization beamPolarization = this.getBlockState()
+                    .getValue(AbsorptionPolarizingFilterBlock.POLARIZATION);
 
             if (beamPolarization.isDiagonal() && !direction.equals(blockDirection)) {
                 beamPolarization = beamPolarization.getNextRotated(2);
             }
-            Lang.text("").add(COLang.Prefixes.CREATE.translate(("gui.goggles.polarization")).withStyle(ChatFormatting.GRAY)).forGoggles(tooltip);
-            Lang.text("").add(COLang.Prefixes.CREATE.translate(beamPolarization.getDescriptionId()).append(" " + beamPolarization.getsIcon()).withStyle(ChatFormatting.AQUA)).forGoggles(tooltip, 1);
+            CreateLang.text("")
+                    .add(COLang.Prefixes.CREATE.translate(("gui.goggles.polarization")).withStyle(ChatFormatting.GRAY))
+                    .forGoggles(tooltip);
+            CreateLang.text("")
+                    .add(Component.translatable(beamPolarization.getDescriptionId())
+                            .append(" " + beamPolarization.getsIcon()).withStyle(ChatFormatting.AQUA))
+                    .forGoggles(tooltip, 1);
 
         }
         return true;

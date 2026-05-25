@@ -1,8 +1,9 @@
 package net.lpcamors.optical.config;
 
-import com.simibubi.create.foundation.config.ConfigBase;
 
-public class COCRecipes extends ConfigBase{
+import net.createmod.catnip.config.ConfigBase;
+
+public class COCRecipes extends ConfigBase {
 
     public final ConfigBase.ConfigFloat focusingSmokingFailedOutputProbability =
             f(0.0F, 0.0F, 1F, "focusingSmokingFailedOutputProbability", Comments.focusingSmokingFailComment);

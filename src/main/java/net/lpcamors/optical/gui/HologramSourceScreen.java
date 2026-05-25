@@ -1,26 +1,20 @@
 package net.lpcamors.optical.gui;
 
-import com.simibubi.create.AllPackets;
-import com.simibubi.create.content.kinetics.transmission.sequencer.ConfigureSequencedGearshiftPacket;
-import com.simibubi.create.content.kinetics.transmission.sequencer.Instruction;
-import com.simibubi.create.foundation.gui.AbstractSimiScreen;
-import com.simibubi.create.foundation.gui.AllGuiTextures;
 import com.simibubi.create.foundation.gui.AllIcons;
 import com.simibubi.create.foundation.gui.widget.IconButton;
 import com.simibubi.create.foundation.gui.widget.Label;
 import com.simibubi.create.foundation.gui.widget.ScrollInput;
 import com.simibubi.create.foundation.gui.widget.SelectionScrollInput;
-import com.simibubi.create.foundation.utility.Components;
-import com.simibubi.create.foundation.utility.Lang;
+
+import net.createmod.catnip.gui.AbstractSimiScreen;
+import net.createmod.catnip.platform.CatnipServices;
 import net.lpcamors.optical.blocks.hologram_source.HologramSourceBlockEntity;
+import net.lpcamors.optical.blocks.hologram_source.HologramSourceBlockEntity.HologramSourceProfile;
 import net.lpcamors.optical.data.COLang;
-import net.lpcamors.optical.network.COPackets;
 import net.lpcamors.optical.network.ConfigureHologramSourcePacket;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
-
 
 public class HologramSourceScreen extends AbstractSimiScreen {
 
@@ -29,20 +23,25 @@ public class HologramSourceScreen extends AbstractSimiScreen {
 
     private ScrollInput modeArea;
     private ScrollInput angleArea;
+    private ScrollInput angleVelocityArea;
     private boolean shouldRenderAngle = false;
     private IconButton confirmButton;
     private Label modeLabel;
     private final CompoundTag tag;
     private int modeIndex;
     private int angle;
+    private int angleVelocity;
     final HologramSourceBlockEntity be;
 
-    public HologramSourceScreen(HologramSourceBlockEntity be){
+    public HologramSourceScreen(HologramSourceBlockEntity be) {
         super(COLang.Prefixes.OPTICAL.translate(("gui.hologram_source.title")));
         this.be = be;
-        this.modeIndex = be.getMode().ordinal();
-        this.angle = be.getFixedAngle();
-        this.tag = be.getModeData();
+        HologramSourceProfile profile = be.getController().getProfile();
+        this.modeIndex = profile.displayMode.ordinal();
+        this.angle = profile.fixedAngle;
+        this.angleVelocity = profile.angleVelocity;
+        this.tag = new CompoundTag();
+        profile.write(this.tag, be.getLevel().registryAccess());
     }
 
     @Override
@@ -58,34 +57,41 @@ public class HologramSourceScreen extends AbstractSimiScreen {
         confirmButton.withCallback(this::onClose);
         addRenderableWidget(confirmButton);
 
-        modeLabel = new Label(x + 29, y + 28, Components.immutableEmpty()).withShadow();
-        modeLabel.text = Components.immutableEmpty();
+        modeLabel = new Label(x + 29, y + 28, Component.empty()).withShadow();
+        modeLabel.text = Component.empty();
 
-        modeArea =
-                new SelectionScrollInput(x + 22, y + 23, 109, 18).forOptions(HologramSourceBlockEntity.Mode.getComponents())
-                        .titled(modeTitle.plainCopy())
-                        .calling(integer -> modeIndex = integer)
-                        .setState(this.modeIndex)
-                        .writingTo(modeLabel);
+        modeArea = new SelectionScrollInput(x + 22, y + 23, 109, 18)
+                .forOptions(HologramSourceBlockEntity.Mode.getComponents())
+                .titled(modeTitle.plainCopy())
+                .calling(integer -> modeIndex = integer)
+                .setState(this.modeIndex)
+                .writingTo(modeLabel);
 
         shouldRenderAngle = HologramSourceBlockEntity.Mode.values()[this.modeIndex].isShouldRenderAngle();
 
-        angleArea =
-                new ScrollInput(x + 133, y + 23, 28, 18).withRange(0, 360)
-                        .calling(integer -> this.angle = integer)
-                        .setState(this.angle);
+        angleArea = new ScrollInput(x + 133, y + 23, 28, 18).withRange(0, 360)
+                .calling(integer -> this.angle = integer)
+                .setState(this.angle);
+
+        angleVelocityArea = new ScrollInput(x + 133, y + 23, 28, 18).withRange(1, 361)
+                .calling(integer -> this.angleVelocity = integer)
+                .setState(this.angleVelocity);
 
         addRenderableWidget(modeArea);
         addRenderableWidget(angleArea);
+        addRenderableWidget(angleVelocityArea);
     }
 
     public void sendPacket() {
         CompoundTag tag = new CompoundTag();
         tag.putInt("ModeIndex", this.modeIndex);
         tag.putInt("Angle", this.angle);
-        if(tag.equals(this.tag)) return;
-        COPackets.getChannel()
-                .sendToServer(new ConfigureHologramSourcePacket(be.getBlockPos(), tag));
+        tag.putInt("AngleVelocity", this.angleVelocity);
+        if (tag.equals(this.tag))
+            return;
+        CatnipServices.NETWORK
+                .sendToServer(new ConfigureHologramSourcePacket(be.getBlockPos(), this.modeIndex, this.angle,
+                        this.angleVelocity));
     }
 
     @Override
@@ -100,21 +106,29 @@ public class HologramSourceScreen extends AbstractSimiScreen {
 
         background.render(graphics, x, y);
 
-        graphics.drawString(font, title, x + (background.width - 8) / 2 - font.width(title) / 2, y + 4, 0x592424, false);
+        graphics.drawString(font, title, x + (background.width - 8) / 2 - font.width(title) / 2, y + 4, 0x592424,
+                false);
 
-        label(graphics, 30,  28, COLang.Prefixes.OPTICAL.translate(HologramSourceBlockEntity.Mode.values()[this.modeArea.getState()].getTranslationKey()));
+        label(graphics, 30, 28, COLang.Prefixes.OPTICAL
+                .translate(HologramSourceBlockEntity.Mode.values()[this.modeArea.getState()].getTranslationKey()));
         shouldRenderAngle = HologramSourceBlockEntity.Mode.values()[this.modeArea.getState()].isShouldRenderAngle();
 
         this.angleArea.visible = this.shouldRenderAngle;
-        if(shouldRenderAngle){
-            COGuiTextures toDraw = COGuiTextures.HOLOGRAM_PLUS_SLOT;
-            toDraw.render(graphics, x + 130, y + 23);
-            Component c = Component.literal(this.angleArea.getState()+"°");
+        COGuiTextures toDraw = COGuiTextures.HOLOGRAM_PLUS_SLOT;
+        toDraw.render(graphics, x + 130, y + 23);
+        if (shouldRenderAngle) {
+            Component c = Component.literal(this.angleArea.getState() + "°");
 
-            label(graphics, 148 - font.width(c) / 2,  28, c);
+            label(graphics, 148 - font.width(c) / 2, 28, c);
+
+        } else {
+            Component c = Component.literal(this.angleVelocityArea.getState() + "°/s");
+
+            label(graphics, 148 - font.width(c) / 2, 28, c);
 
         }
     }
+
     private void label(GuiGraphics graphics, int x, int y, Component text) {
         graphics.drawString(font, text, guiLeft + x, guiTop + y, 0xFFFFEE);
     }

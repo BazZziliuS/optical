@@ -1,47 +1,50 @@
 package net.lpcamors.optical.network;
 
 import com.simibubi.create.foundation.networking.BlockEntityConfigurationPacket;
+
+import net.lpcamors.optical.CreateOptical;
 import net.lpcamors.optical.blocks.hologram_source.HologramSourceBlockEntity;
 import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.server.level.ServerPlayer;
 
 public class ConfigureHologramSourcePacket extends BlockEntityConfigurationPacket<HologramSourceBlockEntity> {
 
-    private CompoundTag tag;
+    public static final StreamCodec<RegistryFriendlyByteBuf, ConfigureHologramSourcePacket> STREAM_CODEC = StreamCodec
+            .composite(
+                    BlockPos.STREAM_CODEC, packet -> packet.pos,
+                    ByteBufCodecs.INT, a -> a.mode,
+                    ByteBufCodecs.INT, a -> a.angle,
+                    ByteBufCodecs.INT, a -> a.angleVelocity,
+                    ConfigureHologramSourcePacket::new);
 
-    public ConfigureHologramSourcePacket(FriendlyByteBuf buffer) {
-        super(buffer);
-    }
+    private final int mode, angle, angleVelocity;
 
-    public ConfigureHologramSourcePacket(BlockPos blockPos, CompoundTag tag) {
-        super(blockPos);
-        this.tag = tag;
-
-    }
-
-    @Override
-    protected void writeSettings(FriendlyByteBuf buffer) {
-        buffer.writeNbt(this.tag);
-    }
-
-    @Override
-    protected void readSettings(FriendlyByteBuf buffer) {
-        this.tag = buffer.readNbt();
+    public ConfigureHologramSourcePacket(BlockPos pos, int mode, int angle, int angleVelocity) {
+        super(pos);
+        this.mode = mode;
+        this.angle = angle;
+        this.angleVelocity = angleVelocity;
     }
 
     @Override
-    protected void applySettings(HologramSourceBlockEntity be) {
+    public PacketTypeProvider getTypeProvider() {
+        return COPackets.CONFIGURE_HOLOGRAM;
+    }
+
+    @Override
+    protected void applySettings(ServerPlayer player, HologramSourceBlockEntity be) {
         try {
             HologramSourceBlockEntity controller = be.getController();
-            controller.setMode(tag.getInt("ModeIndex"));
-            controller.setFixedAngle(tag.getInt("Angle"));
+            controller.getProfile().displayMode = HologramSourceBlockEntity.Mode.values()[this.mode
+                    % HologramSourceBlockEntity.Mode.values().length];
+            controller.getProfile().fixedAngle = this.angle;
+            controller.getProfile().angleVelocity = this.angleVelocity;
             be.sendData();
-            controller.onConnection(controller.getBlockPos(), false, opBe -> opBe.ifPresent(be1 -> be1.updateConnection(controller)));
-
-        } catch (Exception ex){
-            System.out.println("Unable to send data to server in "+be.toString());
+        } catch (Exception ex) {
+            CreateOptical.LOGGER.error("Unable to send data to server in " + be.toString());
         }
 
     }

@@ -1,7 +1,6 @@
 package net.lpcamors.optical.blocks.optical_receptor;
 
-import com.simibubi.create.content.kinetics.gauge.GaugeBlock;
-import com.simibubi.create.foundation.utility.VoxelShaper;
+import net.createmod.catnip.math.VoxelShaper;
 import net.lpcamors.optical.COShapes;
 import net.minecraft.core.Direction;
 import net.minecraft.world.phys.Vec3;

@@ -1,78 +1,78 @@
 {
   "variants": {
     "facing=east,polarization=diagonal_negative": {
-      "model": "create_optical:block/absorption_polarizing_filter/block",
+      "model": "create_optical:block/absorption_polarizing_filter/block_diagonal_negative",
       "y": 90
     },
     "facing=east,polarization=diagonal_positive": {
-      "model": "create_optical:block/absorption_polarizing_filter/block",
+      "model": "create_optical:block/absorption_polarizing_filter/block_diagonal_positive",
       "y": 90
     },
     "facing=east,polarization=horizontal": {
-      "model": "create_optical:block/absorption_polarizing_filter/block",
+      "model": "create_optical:block/absorption_polarizing_filter/block_horizontal",
       "y": 90
     },
     "facing=east,polarization=random": {
-      "model": "create_optical:block/absorption_polarizing_filter/block",
+      "model": "create_optical:block/absorption_polarizing_filter/block_random",
       "y": 90
     },
     "facing=east,polarization=vertical": {
-      "model": "create_optical:block/absorption_polarizing_filter/block",
+      "model": "create_optical:block/absorption_polarizing_filter/block_vertical",
       "y": 90
     },
     "facing=north,polarization=diagonal_negative": {
-      "model": "create_optical:block/absorption_polarizing_filter/block"
+      "model": "create_optical:block/absorption_polarizing_filter/block_diagonal_negative"
     },
     "facing=north,polarization=diagonal_positive": {
-      "model": "create_optical:block/absorption_polarizing_filter/block"
+      "model": "create_optical:block/absorption_polarizing_filter/block_diagonal_positive"
     },
     "facing=north,polarization=horizontal": {
-      "model": "create_optical:block/absorption_polarizing_filter/block"
+      "model": "create_optical:block/absorption_polarizing_filter/block_horizontal"
     },
     "facing=north,polarization=random": {
-      "model": "create_optical:block/absorption_polarizing_filter/block"
+      "model": "create_optical:block/absorption_polarizing_filter/block_random"
     },
     "facing=north,polarization=vertical": {
-      "model": "create_optical:block/absorption_polarizing_filter/block"
+      "model": "create_optical:block/absorption_polarizing_filter/block_vertical"
     },
     "facing=south,polarization=diagonal_negative": {
-      "model": "create_optical:block/absorption_polarizing_filter/block",
+      "model": "create_optical:block/absorption_polarizing_filter/block_diagonal_negative",
       "y": 180
     },
     "facing=south,polarization=diagonal_positive": {
-      "model": "create_optical:block/absorption_polarizing_filter/block",
+      "model": "create_optical:block/absorption_polarizing_filter/block_diagonal_positive",
       "y": 180
     },
     "facing=south,polarization=horizontal": {
-      "model": "create_optical:block/absorption_polarizing_filter/block",
+      "model": "create_optical:block/absorption_polarizing_filter/block_horizontal",
       "y": 180
     },
     "facing=south,polarization=random": {
-      "model": "create_optical:block/absorption_polarizing_filter/block",
+      "model": "create_optical:block/absorption_polarizing_filter/block_random",
       "y": 180
     },
     "facing=south,polarization=vertical": {
-      "model": "create_optical:block/absorption_polarizing_filter/block",
+      "model": "create_optical:block/absorption_polarizing_filter/block_vertical",
       "y": 180
     },
     "facing=west,polarization=diagonal_negative": {
-      "model": "create_optical:block/absorption_polarizing_filter/block",
+      "model": "create_optical:block/absorption_polarizing_filter/block_diagonal_negative",
       "y": 270
     },
     "facing=west,polarization=diagonal_positive": {
-      "model": "create_optical:block/absorption_polarizing_filter/block",
+      "model": "create_optical:block/absorption_polarizing_filter/block_diagonal_positive",
       "y": 270
     },
     "facing=west,polarization=horizontal": {
-      "model": "create_optical:block/absorption_polarizing_filter/block",
+      "model": "create_optical:block/absorption_polarizing_filter/block_horizontal",
       "y": 270
     },
     "facing=west,polarization=random": {
-      "model": "create_optical:block/absorption_polarizing_filter/block",
+      "model": "create_optical:block/absorption_polarizing_filter/block_random",
       "y": 270
     },
     "facing=west,polarization=vertical": {
-      "model": "create_optical:block/absorption_polarizing_filter/block",
+      "model": "create_optical:block/absorption_polarizing_filter/block_vertical",
       "y": 270
     }
   }

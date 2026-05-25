@@ -1,0 +1,69 @@
+{
+  "type": "create:sequenced_assembly",
+  "ingredient": {
+    "item": "create:andesite_alloy"
+  },
+  "loops": 6,
+  "results": [
+    {
+      "chance": 100.0,
+      "id": "create_optical:golden_coil"
+    },
+    {
+      "chance": 10.0,
+      "id": "create:golden_sheet"
+    }
+  ],
+  "sequence": [
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        {
+          "item": "create_optical:incomplete_golden_coil"
+        },
+        {
+          "item": "create:golden_sheet"
+        }
+      ],
+      "results": [
+        {
+          "id": "create_optical:incomplete_golden_coil"
+        }
+      ]
+    },
+    {
+      "type": "create:filling",
+      "ingredients": [
+        {
+          "item": "create_optical:incomplete_golden_coil"
+        },
+        {
+          "type": "neoforge:single",
+          "amount": 250,
+          "fluid": "minecraft:lava"
+        }
+      ],
+      "results": [
+        {
+          "id": "create_optical:incomplete_golden_coil"
+        }
+      ]
+    },
+    {
+      "type": "create:pressing",
+      "ingredients": [
+        {
+          "item": "create_optical:incomplete_golden_coil"
+        }
+      ],
+      "results": [
+        {
+          "id": "create_optical:incomplete_golden_coil"
+        }
+      ]
+    }
+  ],
+  "transitional_item": {
+    "id": "create_optical:incomplete_golden_coil"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "create:andesite_casing"
+    },
+    {
+      "item": "create_optical:polarizing_filter"
+    }
+  ],
+  "result": {
+    "count": 1,
+    "id": "create_optical:absorption_polarizing_filter"
+  }
+}

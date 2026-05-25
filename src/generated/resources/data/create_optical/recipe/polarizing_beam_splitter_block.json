@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "create:andesite_casing"
+    },
+    {
+      "item": "create_optical:mirror"
+    },
+    {
+      "item": "create_optical:mirror"
+    }
+  ],
+  "result": {
+    "count": 1,
+    "id": "create_optical:polarizing_beam_splitter_block"
+  }
+}

@@ -1,14 +1,15 @@
 package net.lpcamors.optical;
 
-import com.jozufozu.flywheel.core.PartialModel;
+import dev.engine_room.flywheel.lib.model.baked.PartialModel;
 import net.minecraft.resources.ResourceLocation;
 
 public class COPartialModels {
 
-    public static void initiate(){}
+    public static void initiate() {
+        
+    }
 
-    public static final PartialModel
-            POLARIZING_FILTER = block("absorption_polarizing_filter/filter"),
+    public static final PartialModel POLARIZING_FILTER = block("absorption_polarizing_filter/filter"),
             OPTICAL_SENSOR_LAMP = block("optical_sensor/lamp"),
             OPTICAL_SENSOR_LAMP_GLOW = block("optical_sensor/lamp_glow"),
             MIRROR = block("encased_mirror/mirror"),
@@ -21,7 +22,7 @@ public class COPartialModels {
             HOLOGRAM_BEAM = block("hologram_source/hologram_beam");
 
     private static PartialModel block(String path) {
-        return new PartialModel(new ResourceLocation(COMod.ID, "block/" + path));
+        return PartialModel.of(ResourceLocation.fromNamespaceAndPath(CreateOptical.ID, "block/" + path));
     }
 
 }

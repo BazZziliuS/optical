@@ -3,7 +3,7 @@ package net.lpcamors.optical.blocks.thermal_optical_source;
 import com.simibubi.create.content.kinetics.base.HorizontalKineticBlock;
 import com.simibubi.create.content.kinetics.base.IRotate;
 import com.simibubi.create.foundation.block.IBE;
-import com.simibubi.create.foundation.utility.Iterate;
+import net.createmod.catnip.data.Iterate;
 import net.lpcamors.optical.COShapes;
 import net.lpcamors.optical.blocks.COBlockEntities;
 import net.minecraft.core.BlockPos;
@@ -41,7 +41,7 @@ public class ThermalOpticalSourceBlock extends HorizontalKineticBlock implements
     }
 
 
-    public static boolean hasPipeTowards(LevelReader world, BlockPos pos, BlockState state, Direction face) {
+    public static boolean hasPipeTowards(BlockState state, Direction face) {
         if(face == null) return true;
         return face == Direction.DOWN || state.getValue(HORIZONTAL_FACING)
                 .getCounterClockWise().getAxis().equals(face.getAxis());

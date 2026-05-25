@@ -1,43 +1,88 @@
-![minecraft_title](https://github.com/user-attachments/assets/fe0a6a45-953d-4515-ba1a-1217da721642)
-
-A mod based on transfer rotational force by light.
-
-![Base Profile 2024 09 18 - 21 01 25 05 (2)](https://github.com/user-attachments/assets/96e521f0-5edd-4fd9-bd06-7ff18fc8075f)
-
-This addon adds new blocks, items and mechanics to the mod create.
-Such as:
- - Optical Source: Emit different types of beams based on the rotational force applied;
- - Optical Receptor: Transform the received beam into rotational force based on its properties;
- - Optical Sensor: Emit redstone sinal based on the incident beam properties;
- - Mirror: Reflect the beam perpendicularly;
- - Polarizing Filter: Polarize the beam(duh);
- - Beam Splitter Cube: Split the beam in two and polarize the resultant beams perpendicularly;
- - Beam Condenser: Condenser up to three beams into one combining its properties;
- - Beam Focuser: new type of recipe based on beam's characteristics.
-
-![rec1](https://github.com/user-attachments/assets/07ce17f6-aa7a-467a-be37-8d406819df47)
-
-All the crafts can be found with the JEI mod, and most of the additional mechanics can be found with the ponder(Create Mod) system.
+<p align="center">
+  <img src="https://github.com/luccaPossamai/optical/blob/1.21.1/src/main/resources/logo.png?raw=true" width="1000">
+</p>
 
 
-![Base Profile 2024 06 02 - 01 34 16 02](https://github.com/luccaPossamai/optical/assets/110493821/b7ecf37e-feee-4f32-8e9e-2031a0f22a6d)
-
-New Receptor States
-
-![receptor](https://github.com/user-attachments/assets/1db34baf-dd84-4376-9db7-771670497b0b)
-
-Optical Device application required
-
-![receptor2](https://github.com/user-attachments/assets/643bc3c0-6e85-4350-9d8c-71625562b373)
+<p align="center">
+  <img src="https://github.com/luccaPossamai/optical/blob/1.21.1/src/main/resources/version.png?raw=true" width="400">
+</p>
 
 
-
-Copper Legacy Texture added:
-![copper_title](https://github.com/user-attachments/assets/e956b2d0-5da2-4832-8691-be5ab2ebb4fb)
-
-
+<p align="center">
+  <img src="https://github.com/luccaPossamai/optical/blob/1.21.1/src/main/resources/phrase.png?raw=true" width="1200">
+</p>
 
 
+---
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/96e521f0-5edd-4fd9-bd06-7ff18fc8075f" width="1000">
+</p>
+
+---
+
+This addon adds new blocks, items and mechanics to the mod Create.
+
+### Included mechanics
+
+* Optical Source: emit different types of beams based on the rotational force applied
+* Optical Receptor: transform the received beam into rotational force based on its properties
+* Optical Sensor: emit redstone signal based on the incident beam properties
+* Mirror: reflect the beam perpendicularly
+* Polarizing Filter: polarize the beam (duh)
+* Beam Splitter Cube: split the beam in two and polarize the resultant beams perpendicularly
+* Beam Condenser: condense up to three beams into one combining its properties
+* Beam Focuser: new type of recipe based on beam characteristics
+* Thermal Optical Source: similar to a normal source but with high su usage based on fluid aplications
+* Hologram Display: display text or items in a hologram style
+* Beam Reader: display the properties of the incident beam
+* Beam Modulator: use it to comunicate through light
+---
+
+## Different ways to generate light
 
 
+Produce eletromagnetic waves with rotational force
+
+<p align="center">
+      <img src="https://github.com/luccaPossamai/optical/blob/1.21.1/src/main/resources/sources.png?raw=true" width="1000">
+</p>
+
+---
+
+## New Receptor States
+
+Transform eletromagnetic waves back to rotational force
+<p align="center">
+  <img src="https://github.com/luccaPossamai/optical/blob/1.21.1/src/main/resources/receptors.png?raw=true" width="1000">
+</p>
+
+---
+
+
+## Retextured Optical Sensor
+
+A way to light ambients with style
+<p align="center">
+  <img src="https://github.com/luccaPossamai/optical/blob/1.21.1/src/main/resources/sensors.png?raw=true" width="1000">
+</p>
+
+---
+
+## New Components
+
+Explore some of the other components of the mod (only stable on version 0.4)
+<p align="center">
+  <img src="https://github.com/luccaPossamai/optical/blob/1.21.1/src/main/resources/components.png?raw=true" width="1000">
+</p>
+
+---
+
+All the crafts can be found with the JEI mod, and most additional mechanics can be explored with the Ponder Mod system.
+
+---
+
+Some things may break on changing versions. This mod is developed by one person and occasionally receives contributions via GitHub. Please understand that this project is treated as a hobby and not a full-time job.
+
+---
 

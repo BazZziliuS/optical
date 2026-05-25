@@ -1,218 +1,138 @@
 package net.lpcamors.optical.blocks.beam_condenser;
 
-import com.mojang.datafixers.util.Pair;
-import com.simibubi.create.content.equipment.goggles.IHaveGoggleInformation;
-import com.simibubi.create.foundation.blockEntity.SmartBlockEntity;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import javax.annotation.Nullable;
+
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
-import com.simibubi.create.foundation.utility.Components;
-import com.simibubi.create.foundation.utility.Lang;
-import net.lpcamors.optical.COMod;
-import net.lpcamors.optical.blocks.IBeamReceiver;
-import net.lpcamors.optical.blocks.IBeamSource;
+
 import net.lpcamors.optical.blocks.optical_source.BeamHelper;
-import net.lpcamors.optical.data.COLang;
-import net.minecraft.ChatFormatting;
+import net.lpcamors.optical.blocks.optical_source.BeamHelper.BeamProperties;
+import net.lpcamors.optical.blocks.optical_source.GenericOpticalSourceBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.Vec3i;
+import net.minecraft.core.HolderLookup.Provider;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.NbtUtils;
-import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 
-import javax.annotation.Nullable;
-import java.util.*;
+public class BeamCondenserBlockEntity extends GenericOpticalSourceBlockEntity {
 
-public class BeamCondenserBlockEntity extends SmartBlockEntity implements IHaveGoggleInformation, IBeamSource {
+    protected BeamProperties beamProperties = null;
 
-    private Map<Direction, IBeamReceiver.BeamSourceInstance> beamSourceInstanceMap = emptyMap();
+    protected final Map<Direction, Optional<BeamProperties>> beams = Arrays.stream(Direction.values())
+            .collect(Collectors.toMap(d -> d, d -> Optional.ofNullable((BeamProperties) null)));
 
-    private Map<Pair<Vec3i, Vec3i>, BeamHelper.BeamProperties> beamPropertiesMap = new HashMap<>();
-    private List<BlockPos> iBeamReceiverBlockPos = new ArrayList<>();
-    private List<BlockPos> toIBeamReceiverBlockPos = new ArrayList<>();
-    private int tickCount = 0;
-    private BeamHelper.BeamProperties initialBeamProperties;
+    public BeamCondenserBlockEntity(BlockEntityType<?> typeIn, BlockPos pos, BlockState state) {
+        super(typeIn, pos, state);
+    }
 
-    private static Map<Direction, IBeamReceiver.BeamSourceInstance> emptyMap(){
-        Map<Direction, IBeamReceiver.BeamSourceInstance> map = new HashMap<>();
-        IBeamReceiver.BeamSourceInstance empty = IBeamReceiver.BeamSourceInstance.empty(null);
-        for(Direction direction : Direction.values()){
-            map.put(direction, empty);
+    @Override
+    public void addBehaviours(List<BlockEntityBehaviour> behaviours) {
+    }
+
+    public void removeBeam(BeamProperties prop) {
+        if (beams.get(prop.direction()).isPresent()) {
+            beams.put(prop.direction(), Optional.empty());
         }
-        return map;
+        this.update();
     }
 
-    public BeamCondenserBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
-        super(type, pos, state);
+    public void receiveBeam(BeamProperties prop, boolean force) {
+        if (beams.get(prop.direction()).isEmpty() || force) {
+            beams.put(prop.direction(), Optional.of(prop));
+        }
+        this.update();
     }
 
-    @Override
-    public void addBehaviours(List<BlockEntityBehaviour> behaviours) {}
+    public void update() {
+        if (this.level.isClientSide)
+            return;
+        this.updateBeamProperties();
+        this.setChanged();
+        this.sendData();
+    }
 
-    @Override
-    public void tick() {
-        super.tick();
-        boolean f = false;
-        this.tickCount += 1;
-        for(Direction direction : Direction.values()) {
-            if(this.shouldUpdate(direction)){
-                f = true;
+    public void updateBeamProperties() {
+        Direction blockFacing = this.getBlockState().getValue(BeamCondenserBlock.FACING);
+
+        ArrayList<BeamProperties> prop = new ArrayList<>();
+        this.beams.forEach((direction, opt) -> {
+            if (opt.isPresent()) {
+                if (direction.getAxis().isHorizontal()
+                        && !direction.equals(blockFacing.getOpposite())) {
+                    prop.add(opt.get());
+                }
             }
-        }
-        if(f){
-            this.update();
-        }
-        this.toIBeamReceiverBlockPos = new ArrayList<>();
-        this.beamPropertiesMap.clear();
-        if(this.getInitialBeamProperties() != null && this.getInitialBeamProperties().intensity > 0){
-            IBeamSource.propagateLinearBeamVar(this, this.getBlockPos(), this.getInitialBeamProperties(), 0);
-        }
-        this.iBeamReceiverBlockPos = toIBeamReceiverBlockPos;
-
-    }
-
-    public void update(){
-        this.initialBeamProperties = this.getResultantBeamProperties(this.getBlockState().getValue(BeamCondenserBlock.FACING));
-        this.setChanged();
-    }
-
-    public boolean shouldUpdate(Direction direction){
-        IBeamReceiver.BeamSourceInstance beamSourceInstance = this.beamSourceInstanceMap.get(direction);
-        this.beamSourceInstanceMap.put(direction, beamSourceInstance.checkSourceExistenceAndCompatibility(this));
-        this.setChanged();
-        return !beamSourceInstance.equals(this.beamSourceInstanceMap.get(direction));
-    }
-
-    public boolean changeState(Direction direction, BlockPos pos, BeamHelper.BeamProperties beamProperties){
-        if(this.beamSourceInstanceMap.get(direction).optionalBeamProperties().isEmpty()){
-            this.beamSourceInstanceMap.put(direction, new IBeamReceiver.BeamSourceInstance(Optional.of(beamProperties), pos));
-            this.update();
-            return true;
-        }
-        return beamProperties.equals(beamSourceInstanceMap.get(direction).optionalBeamProperties().orElse(null));
-    }
-
-    public @Nullable BeamHelper.BeamProperties getResultantBeamProperties(Direction direction){
-        List<BeamHelper.BeamProperties> beamProperties = new ArrayList<>();
-        this.beamSourceInstanceMap.keySet().stream().map(direction1 -> this.beamSourceInstanceMap.get(direction1)).forEach(beamSourceInstance -> {
-            beamSourceInstance.optionalBeamProperties().ifPresent(beamProperties::add);
         });
-        if(beamProperties.isEmpty()) return null;
-        return BeamHelper.BeamProperties.sum(direction, beamProperties.stream().toList());
+
+        if (!prop.isEmpty()) {
+            this.beamProperties = new BeamProperties.Builder(blockFacing, prop).isDirty(true).build();
+        } else {
+            this.beamProperties = null;
+        }
     }
 
     @Override
     public @Nullable BeamHelper.BeamProperties getInitialBeamProperties() {
-        return this.initialBeamProperties;
-    }
-
-
-    @Override
-    public void addToBeamBlocks(Vec3i vec, Vec3i vec1, BeamHelper.BeamProperties beamProperties) {
-        this.beamPropertiesMap.put(new Pair<>(vec, vec1), beamProperties);
+        return this.beamProperties;
     }
 
     @Override
-    public Map<Pair<Vec3i, Vec3i>, BeamHelper.BeamProperties> getBeamPropertiesMap() {
-        return this.beamPropertiesMap;
-    }
-
-    @Override
-    public boolean isDependent(BlockPos pos) {
-        return this.iBeamReceiverBlockPos.contains(pos);
-    }
-
-    @Override
-    public void addDependent(BlockPos pos) {
-        this.toIBeamReceiverBlockPos.add(pos);
-    }
-
-
-    @Override
-    public int getTickCount() {
-        return this.tickCount;
-    }
-
-    @Override
-    public boolean shouldRendererLaserBeam() {
-        return this.getInitialBeamProperties() != null && this.getInitialBeamProperties().intensity != 0 && this.getInitialBeamProperties().isVisible() && !this.getBeamPropertiesMap().keySet().isEmpty();
+    public boolean isActive() {
+        return this.beamProperties != null;
     }
 
     @Override
     @OnlyIn(Dist.CLIENT)
     public AABB getRenderBoundingBox() {
-        return INFINITE_EXTENT_AABB;
+        return AABB.INFINITE;
     }
 
     @Override
-    protected void write(CompoundTag compound, boolean clientPacket) {
-        super.write(compound, clientPacket);
+    protected void write(CompoundTag compound, Provider registries, boolean clientPacket) {
+        super.write(compound, registries, clientPacket);
+        ListTag tag = new ListTag(Direction.values().length);
+        for (Direction values : Direction.values()) {
+            this.beams.get(values).ifPresentOrElse(
+                    a -> {
+                        CompoundTag compoundTag = new CompoundTag();
+                        a.write(compoundTag);
+                        tag.add(values.ordinal(), compoundTag);
+                    }, () -> {
 
-        ListTag listTag = new ListTag();
-        this.iBeamReceiverBlockPos.forEach(pos -> {
-            listTag.add(NbtUtils.writeBlockPos(pos));
-        });
-        ListTag listTag1 = new ListTag();
-        Arrays.stream(Direction.values()).forEach(direction -> {
-            CompoundTag tag = new CompoundTag();
-            this.beamSourceInstanceMap.get(direction).write(tag);
-            listTag1.add(tag);
-        });
-        compound.put("IBeamReceiverBlockPosList", listTag);
-        compound.put("IBeamSourceMap", listTag1);
-
-    }
-
-    @Override
-    protected void read(CompoundTag compound, boolean clientPacket) {
-        super.read(compound, clientPacket);
-        if(compound.contains("IBeamReceiverBlockPosList")) {
-            ListTag listTag = (ListTag) compound.get("IBeamReceiverBlockPosList");
-            if (listTag != null) {
-                listTag.forEach(tag -> this.iBeamReceiverBlockPos.add(NbtUtils.readBlockPos((CompoundTag) tag)));
-            }
+                        tag.add(values.ordinal(), new CompoundTag());
+                    });
         }
-        if(compound.contains("IBeamSourceMap")){
-            ListTag listTag = (ListTag) compound.get("IBeamSourceMap");
-            if (listTag != null) {
-                for(int i = 0; i < listTag.size(); i++){
-                    this.beamSourceInstanceMap.put(Direction.values()[i], IBeamReceiver.BeamSourceInstance.read((CompoundTag) listTag.get(i)));
+        compound.put("Beams", tag);
+        if (this.beamProperties != null) {
+            this.beamProperties.write(compound);
+        }
+    }
+
+    @Override
+    protected void read(CompoundTag compound, Provider registries, boolean clientPacket) {
+        super.read(compound, registries, clientPacket);
+        if (compound.contains("Beams")) {
+            ListTag list = compound.getList("Beams", 0);
+            for (Direction direction : Direction.values()) {
+                if (direction.ordinal() < list.size()) {
+                    this.beams.put(direction, BeamProperties.read((CompoundTag) list.get(direction.ordinal())));
+                } else {
+                    this.beams.put(direction, Optional.empty());
                 }
             }
         }
-        if (!clientPacket)
-            return;
-        if (hasLevel())
-            level.sendBlockUpdated(getBlockPos(), getBlockState(), getBlockState(), 16);
-        if (!isVirtual())
-            requestModelDataUpdate();
+        BeamProperties.read(compound).ifPresent(a -> this.beamProperties = a);
     }
-
-    @Override
-    public boolean addToGoggleTooltip(List<Component> tooltip, boolean isPlayerSneaking) {
-        @Nullable BeamHelper.BeamProperties beamProperties = this.getResultantBeamProperties(this.getBlockState().getValue(BeamCondenserBlock.FACING));
-        if(beamProperties != null){
-            Lang.builder("tooltip").translate(COMod.ID +".gui.goggles.beam_properties").forGoggles(tooltip);
-
-            Lang.text("").add(COLang.Prefixes.CREATE.translate(("gui.goggles.beam_type")).withStyle(ChatFormatting.GRAY)).forGoggles(tooltip);
-            Lang.text("").add(COLang.Prefixes.CREATE.translate(beamProperties.beamType.getDescriptionId()).withStyle(ChatFormatting.AQUA)).forGoggles(tooltip, 1);
-            Lang.text("").add(COLang.Prefixes.CREATE.translate(("gui.goggles.propagation_range")).withStyle(ChatFormatting.GRAY)).forGoggles(tooltip);
-            Lang.text("").add(Lang.text(" "+beamProperties.beamType.getRange()+" blocks").style(ChatFormatting.AQUA)).forGoggles(tooltip, 1);
-
-            BeamHelper.BeamPolarization beamPolarization = beamProperties.beamPolarization;
-
-            Lang.text("").add(COLang.Prefixes.CREATE.translate(("gui.goggles.polarization")).withStyle(ChatFormatting.GRAY)).forGoggles(tooltip);
-            Lang.text("").add(COLang.Prefixes.CREATE.translate(beamPolarization.getDescriptionId()).append(" " + beamPolarization.getsIcon()).withStyle(ChatFormatting.AQUA)).forGoggles(tooltip, 1);
-        } else {
-            return false;
-        }
-        return true;
-    }
-
 
 }

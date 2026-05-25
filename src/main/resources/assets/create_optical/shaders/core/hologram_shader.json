@@ -1,0 +1,51 @@
+{
+  "blend": {
+    "func": "add",
+    "srcrgb": "src_alpha",
+    "dstrgb": "one"
+  },
+  "vertex": "create_optical:shaders/core/hologram_shader",
+  "fragment": "create_optical:shaders/core/hologram_shader",
+  "attributes": [
+    "Position",
+    "Color",
+    "UV0",
+    "UV2",
+    "Normal"
+  ],
+  "samplers": [
+    { "name": "Sampler0" }
+  ],
+  "uniforms": [
+    {
+      "name": "ColorModulator",
+      "type": "float",
+      "count": 4,
+      "values": [ 1.0, 1.0, 1.0, 1.0 ]
+    },
+    {
+      "name": "FogStart",
+      "type": "float",
+      "count": 1,
+      "values": [ 0.0 ]
+    },
+    {
+      "name": "FogEnd",
+      "type": "float",
+      "count": 1,
+      "values": [ 1.0 ]
+    },
+    {
+      "name": "FogColor",
+      "type": "float",
+      "count": 4,
+      "values": [ 1.0, 1.0, 1.0, 1.0 ]
+    },
+    {
+      "name": "ScanTime",
+      "type": "float",
+      "count": 1,
+      "values": [ 0.0 ]
+    }
+  ]
+}

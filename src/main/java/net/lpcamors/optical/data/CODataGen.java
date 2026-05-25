@@ -1,43 +1,55 @@
 package net.lpcamors.optical.data;
 
-import com.simibubi.create.foundation.ponder.PonderLocalization;
-import net.lpcamors.optical.COMod;
-import net.lpcamors.optical.ponder.COPonderIndex;
-import net.lpcamors.optical.ponder.COPonderTags;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.BiConsumer;
+
+import com.tterrag.registrate.providers.ProviderType;
+
+import net.createmod.ponder.foundation.PonderIndex;
+import net.lpcamors.optical.CreateOptical;
+import net.lpcamors.optical.ponder.COPonderPlugin;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.DataGenerator;
 import net.minecraft.data.PackOutput;
-import net.minecraftforge.common.data.ExistingFileHelper;
-import net.minecraftforge.data.event.GatherDataEvent;
-
-import java.util.concurrent.CompletableFuture;
+import net.neoforged.neoforge.common.data.ExistingFileHelper;
+import net.neoforged.neoforge.data.event.GatherDataEvent;
 
 public class CODataGen {
 
-    public static void dataGen(GatherDataEvent event){
-        //addExtraRegistrateData();
+    public static void gatherDataHighPriority(GatherDataEvent event) {
+        if (event.getMods().contains(CreateOptical.ID))
+            addExtraRegistrateData();
+    }
+
+    public static void gatherData(GatherDataEvent event) {
+        if (!event.getMods().contains(CreateOptical.ID))
+            return;
+        //
         DataGenerator generator = event.getGenerator();
         PackOutput output = generator.getPackOutput();
         CompletableFuture<HolderLookup.Provider> lookupProvider = event.getLookupProvider();
         ExistingFileHelper existingFileHelper = event.getExistingFileHelper();
-        if (event.includeServer()) {
-            COEntriesProvider generatedEntriesProvider = new COEntriesProvider(output, lookupProvider);
-            generator.addProvider(true, new COBlockTagsProvider(output, lookupProvider, existingFileHelper));
-            generator.addProvider(true, generatedEntriesProvider);
-            generator.addProvider(true, new COSequencedAssemblyRecipeProvider(output));
-            generator.addProvider(true, new FocusingRecipeGen(output));
 
-        }
-        providePonderLang();
+        COEntriesProvider generatedEntriesProvider = new COEntriesProvider(output, lookupProvider);
+        generator.addProvider(event.includeServer(),
+                new COBlockTagsProvider(output, lookupProvider, existingFileHelper));
+        generator.addProvider(event.includeServer(), generatedEntriesProvider);
+        generator.addProvider(event.includeServer(), new COSequencedAssemblyRecipeProvider(output, lookupProvider));
+        generator.addProvider(event.includeServer(), new FocusingRecipeGen(output, lookupProvider));
 
     }
 
+    private static void addExtraRegistrateData() {
+        CreateOptical.REGISTRATE.addDataGenerator(ProviderType.LANG, provider -> {
+            BiConsumer<String, String> langConsumer = provider::add;
+            providePonderLang(langConsumer);
+        });
 
-    private static void providePonderLang() {
-        COPonderTags.initiate();
-        COPonderIndex.initiate();
-        PonderLocalization.provideRegistrateLang(COMod.REGISTRATE);
     }
 
+    private static void providePonderLang(BiConsumer<String, String> consumer) {
+        PonderIndex.addPlugin(new COPonderPlugin());
+        PonderIndex.getLangAccess().provideLang(CreateOptical.ID, consumer);
+    }
 
 }

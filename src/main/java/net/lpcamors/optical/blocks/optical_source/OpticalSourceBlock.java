@@ -3,7 +3,7 @@ package net.lpcamors.optical.blocks.optical_source;
 import com.simibubi.create.content.kinetics.base.HorizontalKineticBlock;
 import com.simibubi.create.content.kinetics.base.IRotate;
 import com.simibubi.create.foundation.block.IBE;
-import com.simibubi.create.foundation.utility.Iterate;
+import net.createmod.catnip.data.Iterate;
 import net.lpcamors.optical.blocks.COBlockEntities;
 import net.lpcamors.optical.COShapes;
 import net.minecraft.core.BlockPos;

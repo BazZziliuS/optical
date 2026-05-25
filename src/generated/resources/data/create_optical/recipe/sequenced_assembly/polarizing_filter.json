@@ -1,0 +1,48 @@
+{
+  "type": "create:sequenced_assembly",
+  "ingredient": {
+    "item": "minecraft:tinted_glass"
+  },
+  "results": [
+    {
+      "chance": 100.0,
+      "id": "create_optical:polarizing_filter"
+    }
+  ],
+  "sequence": [
+    {
+      "type": "create:filling",
+      "ingredients": [
+        {
+          "item": "create_optical:incomplete_polarizing_filter"
+        },
+        {
+          "type": "neoforge:single",
+          "amount": 250,
+          "fluid": "minecraft:water"
+        }
+      ],
+      "results": [
+        {
+          "id": "create_optical:incomplete_polarizing_filter"
+        }
+      ]
+    },
+    {
+      "type": "create:pressing",
+      "ingredients": [
+        {
+          "item": "create_optical:incomplete_polarizing_filter"
+        }
+      ],
+      "results": [
+        {
+          "id": "create_optical:incomplete_polarizing_filter"
+        }
+      ]
+    }
+  ],
+  "transitional_item": {
+    "id": "create_optical:incomplete_polarizing_filter"
+  }
+}

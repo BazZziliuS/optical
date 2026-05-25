@@ -1,160 +1,106 @@
 package net.lpcamors.optical.blocks.optical_receptor;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 import com.simibubi.create.content.kinetics.base.GeneratingKineticBlockEntity;
-import com.simibubi.create.content.kinetics.transmission.sequencer.SequencedGearshiftScreen;
-import com.simibubi.create.foundation.utility.NBTHelper;
-import net.lpcamors.optical.blocks.IBeamReceiver;
+
+import net.createmod.catnip.lang.Lang;
+import net.lpcamors.optical.CreateOptical;
 import net.lpcamors.optical.blocks.optical_source.BeamHelper;
+import net.lpcamors.optical.blocks.optical_source.BeamHelper.BeamProperties;
+import net.lpcamors.optical.data.COLang;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.NonNullList;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraftforge.common.IExtensibleEnum;
-
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import java.util.*;
-import java.util.function.Function;
+import net.neoforged.fml.common.asm.enumextension.IExtensibleEnum;
 
 public class OpticalReceptorBlockEntity extends GeneratingKineticBlockEntity {
 
     public final ReceptorType receptorType;
-
-    private Map<Direction, IBeamReceiver.BeamSourceInstance> beamSourceInstanceMap = emptyMap();
+    private Map<Direction, BeamProperties> beamSourceInstanceMap = new HashMap<>();
     private BeamHelper.BeamProperties initialBeamProperties = null;
+    public HashMap<Direction, ItemStack> sensors = emptyMap();
 
-    public NonNullList<ItemStack> sensor = NonNullList.withSize(4, ItemStack.EMPTY);
-    public Map<Direction, Integer> directionMap = new HashMap<>();
-    public Map<Integer, Direction> integerDirectionMap  = new HashMap<>();
+    public static HashMap<Direction, ItemStack> emptyMap() {
+        HashMap<Direction, ItemStack> map = new HashMap<>();
+        for (Direction dir : Direction.values())
+            map.put(dir, ItemStack.EMPTY);
+        return map;
+    }
 
-    public static OpticalReceptorBlockEntity speed(BlockEntityType<?> type, BlockPos pos, BlockState state){
+    public static OpticalReceptorBlockEntity speed(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         return new OpticalReceptorBlockEntity(type, pos, state, ReceptorType.SPEED);
     }
 
-    public static OpticalReceptorBlockEntity capacity(BlockEntityType<?> type, BlockPos pos, BlockState state){
+    public static OpticalReceptorBlockEntity capacity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         return new OpticalReceptorBlockEntity(type, pos, state, ReceptorType.CAPACITY);
     }
 
-    public OpticalReceptorBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state, ReceptorType receptorType) {
+    public OpticalReceptorBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state,
+            ReceptorType receptorType) {
         super(type, pos, state);
         this.receptorType = receptorType;
 
     }
 
-    private static Map<Direction, IBeamReceiver.BeamSourceInstance> emptyMap(){
-        Map<Direction, IBeamReceiver.BeamSourceInstance> map = new HashMap<>();
-        IBeamReceiver.BeamSourceInstance empty = IBeamReceiver.BeamSourceInstance.empty(null);
-        for(Direction direction : Direction.values()){
-            map.put(direction, empty);
-        }
-        return map;
-    }
-
-
-    public boolean addSensor(@Nonnull ItemStack itemStack, @Nonnull Direction direction){
-        if(this.isVirtual()) return false;
-        int i = getIndexSensorOf(direction);
-        boolean f = i >= 0 && OpticalReceptorBlock.canPlaceSensorAt(direction, this.getBlockState()) && sensor.get(i).isEmpty();
-        if(f) {
-            this.sensor.set(i, itemStack);
-            this.update();
-        }
-        return f;
-    }
-
-    public boolean removeSensor(@Nonnull Direction direction, Optional<Player> player){
-        if(this.isVirtual()) return false;
-        int i = getIndexSensorOf(direction);
-        boolean f = !sensor.get(i).isEmpty();
-        if(f){
-            player.ifPresentOrElse(p -> p.getInventory().add(this.sensor.get(i).copy()), () -> {
-                if(!this.hasLevel()) return;
-                if(!this.level.isClientSide){
-                    Block.popResource(this.level, this.getBlockPos(), this.sensor.get(i));
-                }
-            });
-            this.sensor.set(i, ItemStack.EMPTY);
-            this.update();
-        }
-        return f;
-    }
-    public int getIndexSensorOf(Direction direction){
-        if(this.directionMap.keySet().isEmpty()) updateDirectionMap();
-        return this.directionMap.get(direction);
-    }
-
-    @Override
-    public void tick() {
-        super.tick();
-        if(this.directionMap.keySet().isEmpty()) updateDirectionMap();
-        boolean f = false;
-        for(Direction direction : Direction.values()) {
-            if(this.shouldUpdate(direction)){
-                f = true;
-            }
-        }
-        if(f){
-            this.update();
-        }
-    }
-    public void updateDirectionMap(){
-        int i = 0;
-        for(Direction direction : Direction.values()){
-            if(OpticalReceptorBlock.canPlaceSensorAt(direction, this.getBlockState())){
-                this.directionMap.put(direction, i);
-                this.integerDirectionMap.put(i, direction);
-
-                i++;
-            } else {
-                this.directionMap.put(direction, -1);
-                this.integerDirectionMap.put(-1, direction);
-            }
-        }
-    }
-
-
-
-    public void update(){
-        this.initialBeamProperties = this.getResultantBeamProperties(this.getBlockState().getValue(OpticalReceptorBlock.FACING));
+    public void update() {
+        if (this.level.isClientSide)
+            return;
+        this.updateBeamProperties();
+        this.setChanged();
+        this.sendData();
         updateGeneratedRotation();
-        this.setChanged();
+
     }
-    public @Nullable BeamHelper.BeamProperties getResultantBeamProperties(Direction direction){
-        List<BeamHelper.BeamProperties> beamProperties = new ArrayList<>();
-        this.beamSourceInstanceMap.keySet().stream().map(direction1 -> this.beamSourceInstanceMap.get(direction1)).forEach(beamSourceInstance -> {
-            beamSourceInstance.optionalBeamProperties().ifPresent(beamProperties::add);
+
+    public void updateBeamProperties() {
+        ArrayList<BeamProperties> props = new ArrayList<>();
+        this.beamSourceInstanceMap.forEach((direction, prop) -> {
+            if (!this.sensors.get(direction).isEmpty()) {
+                props.add(this.beamSourceInstanceMap.get(direction));
+            }
         });
-        if(beamProperties.isEmpty()) return null;
-        return BeamHelper.BeamProperties.sum(direction, beamProperties.stream().toList());
-    }
-
-    public boolean shouldUpdate(Direction direction){
-        IBeamReceiver.BeamSourceInstance beamSourceInstance = this.beamSourceInstanceMap.get(direction);
-        this.beamSourceInstanceMap.put(direction, beamSourceInstance.checkSourceExistenceAndCompatibility(this));
-        this.setChanged();
-        boolean f = !beamSourceInstance.equals(this.beamSourceInstanceMap.get(direction));
-        return f;
-    }
-    public boolean changeState(Direction direction, BlockPos pos, BeamHelper.BeamProperties beamProperties){
-        int i = getIndexSensorOf(direction.getOpposite());
-        if(i < 0 || i > 3) return false;
-        if(this.sensor.get(i).isEmpty()) return false;
-        if(this.beamSourceInstanceMap.get(direction).optionalBeamProperties().isEmpty()){
-            this.beamSourceInstanceMap.put(direction, new IBeamReceiver.BeamSourceInstance(Optional.of(beamProperties), pos));
-            this.update();
-            return true;
+        if (!props.isEmpty()) {
+            this.initialBeamProperties = new BeamProperties.Builder(
+                    this.getBlockState().getValue(OpticalReceptorBlock.FACING),
+                    props).build();
+        } else {
+            this.initialBeamProperties = null;
         }
-        return beamProperties.equals(beamSourceInstanceMap.get(direction).optionalBeamProperties().orElse(null));
     }
 
-    public OpticalReceptorBlock.OpticalReceptorGearHeaviness getGearHeaviness(){
+    public void receiveBeam(BeamHelper.BeamProperties beamProperties, boolean force) {
+        if (!this.beamSourceInstanceMap.containsKey(beamProperties.direction().getOpposite()) || force) {
+            this.beamSourceInstanceMap.put(beamProperties.direction().getOpposite(), beamProperties);
+            this.update();
+        }
+    }
+
+    public void removeBeam(BeamHelper.BeamProperties beamProperties) {
+        this.beamSourceInstanceMap.remove(beamProperties.direction().getOpposite());
+        this.update();
+    }
+
+    public OpticalReceptorBlock.OpticalReceptorGearHeaviness getGearHeaviness() {
         return ((OpticalReceptorBlock) this.getBlockState().getBlock()).heaviness;
     }
 
@@ -170,81 +116,99 @@ public class OpticalReceptorBlockEntity extends GeneratingKineticBlockEntity {
         return f == null ? super.calculateAddedStressCapacity() : f;
     }
 
-
-
-
     @Override
-    protected void read(CompoundTag compound, boolean clientPacket) {
-        super.read(compound, clientPacket);
-        if(compound.contains("IBeamSourceMap")){
+    protected void read(CompoundTag compound, HolderLookup.Provider prov, boolean clientPacket) {
+        super.read(compound, prov, clientPacket);
+        if (compound.contains("IBeamSourceMap")) {
             ListTag listTag = (ListTag) compound.get("IBeamSourceMap");
             if (listTag != null) {
-                for(int i = 0; i < listTag.size(); i++){
-                    this.beamSourceInstanceMap.put(Direction.values()[i], IBeamReceiver.BeamSourceInstance.read((CompoundTag) listTag.get(i)));
+                for (int i = 0; i < listTag.size(); i++) {
+                    Optional<BeamProperties> optional = BeamProperties.read((CompoundTag) listTag.get(i));
+                    if (optional.isPresent()) {
+                        this.beamSourceInstanceMap.put(Direction.values()[i], optional.get());
+                    }
                 }
             }
         }
-        this.initialBeamProperties = this.getResultantBeamProperties(this.getBlockState().getValue(OpticalReceptorBlock.FACING));
-        if(!clientPacket){}
-        if(compound.contains("SensorItems")){
-            this.sensor = NonNullList.withSize(4, ItemStack.EMPTY);
-            List<ItemStack> itemStacks = NBTHelper.readItemList(compound.getList("SensorItems", Tag.TAG_COMPOUND));
-            for(int i = 0; i < this.sensor.size(); i++){
-                this.sensor.set(i, itemStacks.get(i));
-            }
-
+        this.sensors = emptyMap();
+        if (compound.contains("SensorMap")) {
+            ListTag list = (ListTag) compound.get("SensorMap");
+            Arrays.stream(Direction.values()).forEach(direction -> {
+                ItemStack stack = direction.ordinal() < list.size()
+                        ? ItemStack.parseOptional(prov, (CompoundTag) list.get(direction.ordinal()))
+                        : ItemStack.EMPTY;
+                this.sensors.put(direction, stack);
+            });
         }
-        if(hasLevel())
+        this.updateBeamProperties();
+        this.setChanged();
+        this.sendData();
+        updateGeneratedRotation();
+
+        if (hasLevel())
             level.sendBlockUpdated(getBlockPos(), getBlockState(), getBlockState(), 16);
-
     }
-    @Override
-    public void write(CompoundTag compound, boolean clientPacket) {
 
+    @Override
+    public void write(CompoundTag compound, HolderLookup.Provider prov, boolean clientPacket) {
+
+        super.write(compound, prov, clientPacket);
         ListTag listTag1 = new ListTag();
         Arrays.stream(Direction.values()).forEach(direction -> {
             CompoundTag tag = new CompoundTag();
-            this.beamSourceInstanceMap.get(direction).write(tag);
+            if (this.beamSourceInstanceMap.containsKey(direction)) {
+                if (this.beamSourceInstanceMap.get(direction) != null) {
+                    this.beamSourceInstanceMap.get(direction).write(tag);
+                }
+            }
             listTag1.add(tag);
         });
         compound.put("IBeamSourceMap", listTag1);
-        compound.put("SensorItems",
-                NBTHelper.writeItemList(this.sensor));
-        super.write(compound, clientPacket);
+        writeSensors(compound, prov, this.sensors);
 
+    }
 
+    public static void writeSensors(CompoundTag compound, HolderLookup.Provider prov, Map<Direction, ItemStack> map) {
+
+        ListTag list = new ListTag(Direction.values().length);
+        Arrays.stream(Direction.values()).forEachOrdered(direction -> {
+            list.add(direction.ordinal(), map.get(direction).saveOptional(prov));
+        });
+        compound.put("SensorMap", list);
     }
 
     public enum ReceptorType implements IExtensibleEnum {
         SPEED("speed",
                 be -> {
-                    return be.initialBeamProperties != null ? be.initialBeamProperties.getTheoreticalIntensitySpeed() : 0F;
+                    return be.initialBeamProperties != null ? be.initialBeamProperties.getEffectiveSpeed()
+                            : 0F;
                 },
-                be -> null
-        ),
+                be -> 8f),
+
         CAPACITY("capacity",
                 be -> {
                     return be.initialBeamProperties != null ? 32F : 0F;
                 },
                 be -> {
                     if (be.initialBeamProperties != null) {
-                        return Math.abs(be.initialBeamProperties.getTheoreticalIntensitySpeed()) * 8f / 32f;
+                        return Math.abs(be.initialBeamProperties.getEffectiveSpeed()) * 8f / 32f;
                     }
                     return 0F;
-                }
-        ),
-        ;
+                }),
+                ;
+
         private final String nameId;
         private final Function<OpticalReceptorBlockEntity, Float> speed;
         private final Function<OpticalReceptorBlockEntity, Float> capacity;
 
-        ReceptorType(String nameId, Function<OpticalReceptorBlockEntity, Float> speed, Function<OpticalReceptorBlockEntity, Float> capacity){
+        ReceptorType(String nameId, Function<OpticalReceptorBlockEntity, Float> speed,
+                Function<OpticalReceptorBlockEntity, Float> capacity) {
             this.nameId = nameId;
             this.speed = speed;
             this.capacity = capacity;
         }
 
-        public @Nullable Float getSpeed(OpticalReceptorBlockEntity be){
+        public @Nullable Float getSpeed(OpticalReceptorBlockEntity be) {
             return this.speed.apply(be);
         }
 
@@ -252,12 +216,111 @@ public class OpticalReceptorBlockEntity extends GeneratingKineticBlockEntity {
             return this.capacity.apply(be);
         }
 
-        public static ReceptorType create(String name, String nameId, Function<OpticalReceptorBlockEntity, Float> speed, Function<OpticalReceptorBlockEntity, Float> capacity){
+        public String getNameId() {
+            return nameId;
+        }
+
+        public Function<OpticalReceptorBlockEntity, Float> getSpeed() {
+            return speed;
+        }
+
+        public Function<OpticalReceptorBlockEntity, Float> getCapacity() {
+            return capacity;
+        }
+
+        public static ReceptorType create(String name, String nameId, Function<OpticalReceptorBlockEntity, Float> speed,
+                Function<OpticalReceptorBlockEntity, Float> capacity) {
             throw new IllegalStateException("Enum not extended");
         }
     }
 
+    public List<Direction> getForbiddenSensorDirection() {
+        List<Direction> dirs = new ArrayList<>();
+        for (Direction values : Direction.values()) {
+            if (((OpticalReceptorBlock) this.getBlockState().getBlock()).hasShaftTowards(this.level, this.getBlockPos(),
+                    this.getBlockState(), values))
+                dirs.add(values);
 
+        }
+        return dirs;
+    }
 
+    public boolean addSensor(@Nonnull ItemStack itemStack, @Nonnull Direction direction) {
+        if (this.isVirtual())
+            return false;
+        if (!this.sensors.get(direction).isEmpty())
+            return false;
+        if (this.getForbiddenSensorDirection().contains(direction))
+            return false;
+        this.sensors.put(direction, itemStack);
+        this.update();
+        return true;
+    }
+
+    public boolean removeSensor(@Nonnull Direction direction, Optional<Player> player) {
+        if (this.isVirtual())
+            return false;
+        if (this.sensors.get(direction).isEmpty())
+            return false;
+        ItemStack stack = this.sensors.get(direction).copy();
+        player.ifPresent(p -> {
+            if (!p.addItem(stack))
+                p.drop(stack, false);
+        });
+        this.sensors.put(direction, ItemStack.EMPTY);
+        this.update();
+        return true;
+
+    }
+
+    public void updateSensorsMap() {
+        List<Direction> dirs = this.getForbiddenSensorDirection();
+        for (Direction direction : dirs) {
+            ItemStack stack = this.sensors.get(direction);
+            if (!stack.isEmpty()) {
+                for (Direction freeDir : Direction.values()) {
+                    if (this.sensors.get(freeDir).isEmpty() && !dirs.contains(freeDir)) {
+                        this.sensors.put(freeDir, stack);
+                        this.sensors.put(direction, ItemStack.EMPTY);
+                        break;
+                    }
+                }
+                if (!this.sensors.get(direction).isEmpty()) {
+                    Block.popResource(this.level, this.getBlockPos(), stack);// drop
+                }
+            }
+        }
+    }
+
+    @Override
+    public boolean addToGoggleTooltip(List<Component> tooltip, boolean isPlayerSneaking) {
+        Lang.builder("tooltip").translate(CreateOptical.ID + ".gui.goggles.receptor_properties").forGoggles(tooltip);
+
+        Lang.builder("")
+                .add(COLang.Prefixes.CREATE.translate(("gui.goggles.sensor_count")).withStyle(ChatFormatting.GRAY))
+                .forGoggles(tooltip);
+        int i = 6 - this.sensors.values().stream().filter(ItemStack::isEmpty).toList().size();
+        MutableComponent component = Component.empty();
+        for (int j = 0; j < 4; j++) {
+            if (j < i) {
+                component.append(Component.literal("■ ").withStyle(ChatFormatting.GREEN));
+            } else {
+                component.append(Component.literal("□ ").withStyle(ChatFormatting.GRAY));
+            }
+        }
+        if (i == 0) {
+            component.append(
+                    COLang.Prefixes.CREATE.translate("gui.goggles.sensor_count.empty").withStyle(ChatFormatting.BLACK));
+        } else if (i == 4) {
+            component.append(
+                    COLang.Prefixes.CREATE.translate("gui.goggles.sensor_count.full").withStyle(ChatFormatting.BLACK));
+        }
+        Lang.builder("")
+                .add(component)
+                .forGoggles(tooltip, 1);
+
+        super.addToGoggleTooltip(tooltip, isPlayerSneaking);
+        return true;
+    }
 
 }

@@ -1,28 +1,54 @@
 {
   "variants": {
-    "facing=down": {
+    "encased=false,facing=down": {
       "model": "create_optical:block/encased_mirror/block",
       "x": 180
     },
-    "facing=east": {
+    "encased=false,facing=east": {
       "model": "create_optical:block/encased_mirror/block",
       "x": 90,
       "y": 90
     },
-    "facing=north": {
+    "encased=false,facing=north": {
       "model": "create_optical:block/encased_mirror/block",
       "x": 90
     },
-    "facing=south": {
+    "encased=false,facing=south": {
       "model": "create_optical:block/encased_mirror/block",
       "x": 90,
       "y": 180
     },
-    "facing=up": {
+    "encased=false,facing=up": {
       "model": "create_optical:block/encased_mirror/block"
     },
-    "facing=west": {
+    "encased=false,facing=west": {
       "model": "create_optical:block/encased_mirror/block",
+      "x": 90,
+      "y": 270
+    },
+    "encased=true,facing=down": {
+      "model": "create_optical:block/encased_mirror/block_encased",
+      "x": 180
+    },
+    "encased=true,facing=east": {
+      "model": "create_optical:block/encased_mirror/block_encased",
+      "x": 90,
+      "y": 90
+    },
+    "encased=true,facing=north": {
+      "model": "create_optical:block/encased_mirror/block_encased",
+      "x": 90
+    },
+    "encased=true,facing=south": {
+      "model": "create_optical:block/encased_mirror/block_encased",
+      "x": 90,
+      "y": 180
+    },
+    "encased=true,facing=up": {
+      "model": "create_optical:block/encased_mirror/block_encased"
+    },
+    "encased=true,facing=west": {
+      "model": "create_optical:block/encased_mirror/block_encased",
       "x": 90,
       "y": 270
     }

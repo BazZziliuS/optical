@@ -1,0 +1,7 @@
+{
+    "parent": "create_optical:block/optical_sensor/base",
+    "textures": {
+        "particle": "create:block/shadow_steel_casing",
+        "top": "create_optical:block/optical_sensor/sensor_base_shadow_steel"
+    }
+}   

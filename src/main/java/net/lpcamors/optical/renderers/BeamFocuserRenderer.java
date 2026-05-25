@@ -1,116 +1,63 @@
 package net.lpcamors.optical.renderers;
 
-import com.mojang.blaze3d.platform.GlStateManager;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.blaze3d.vertex.VertexFormat;
 import com.simibubi.create.content.kinetics.base.ShaftRenderer;
 import com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringRenderer;
-import com.simibubi.create.foundation.render.CachedBufferer;
-import com.simibubi.create.foundation.render.SuperByteBuffer;
-import com.simibubi.create.foundation.utility.AngleHelper;
-import com.simibubi.create.foundation.utility.Color;
+
+import dev.engine_room.flywheel.api.visualization.VisualizationManager;
+import net.createmod.catnip.render.CachedBuffers;
 import net.lpcamors.optical.COPartialModels;
+import net.lpcamors.optical.CORenderTypes;
 import net.lpcamors.optical.blocks.beam_focuser.BeamFocuserBlockEntity;
-import net.lpcamors.optical.blocks.optical_source.OpticalSourceBlock;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.*;
+import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
-import net.minecraft.client.renderer.texture.TextureAtlas;
-import net.minecraft.core.Direction;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.core.Vec3i;
+import net.minecraft.world.level.lighting.LightEngine;
 
 public class BeamFocuserRenderer extends ShaftRenderer<BeamFocuserBlockEntity> {
 
-
-
+    private static final int CYCLE_TICK = 15;
+    private static final float HEIGHT = 21 / 16F;
 
     public BeamFocuserRenderer(BlockEntityRendererProvider.Context context) {
         super(context);
     }
+
     @Override
-    protected void renderSafe(BeamFocuserBlockEntity be, float partialTicks, PoseStack ms, MultiBufferSource buffer, int light, int overlay) {
+    protected void renderSafe(BeamFocuserBlockEntity be, float partialTicks, PoseStack ms, MultiBufferSource buffer,
+            int light,
+            int overlay) {
         super.renderSafe(be, partialTicks, ms, buffer, light, overlay);
-        BlockState blockState = be.getBlockState();
-        Direction direction = blockState.getValue(OpticalSourceBlock.HORIZONTAL_FACING);
-        ms.pushPose();
         FilteringRenderer.renderOnBlockEntity(be, partialTicks, ms, buffer, light, overlay);
-        ms.translate(0, -0.37,0);
-        ms.scale(1, 1.1F, 1F);
+        if (VisualizationManager.supportsVisualization(be.getLevel())) {
+            if (be.processingTicks >= 5 && be.getOptionalBeamProperties().isPresent()) {
+                Vec3i color = be.getOptionalBeamProperties().get().color();
+                ms.translate(0, 4 / 16f, 0);
+                for (int i = 0; i < 2; i++) {
+                    ms.pushPose();
+                    float yOffset = getYOffset(be, partialTicks, i);
+                    float scale = 1f + ((yOffset / 1.5f) / 3);
+                    ms.translate(0, -yOffset, 0);
+                    ms.translate(0.5, 0.5, 0.5);
+                    ms.scale(scale, scale, scale);
+                    ms.translate(-0.5, -0.5, -0.5);
+                    CachedBuffers.partial(COPartialModels.FOCUS_BEAM, be.getBlockState())
+                            .light(LightEngine.MAX_LEVEL).color(color.getX(), color.getY(), color.getZ(), 150)
+                            .renderInto(ms, buffer.getBuffer(CORenderTypes.TRANSPARENT_ADDITIVE));
+                    ms.translate(0, -0.01, 0);
+                    CachedBuffers.partial(COPartialModels.FOCUS_BEAM, be.getBlockState())
+                            .light(LightEngine.MAX_LEVEL / 2).color(color.getX(), color.getY(), color.getZ(), 255)
+                            .renderInto(ms, buffer.getBuffer(CORenderTypes.TRANSPARENT_ADDITIVE));
 
-
-        double k = 0.08;
-        double radius = 18;
-        double alpha = 1.25;
-        if(be.processingTicks >= 5 && be.processingTicks <= be.getProcessDuration()){
-            double angle = be.getAngle(partialTicks, radius, k, alpha);
-            VertexConsumer vb = buffer.getBuffer(RenderType.translucentNoCrumbling());
-            SuperByteBuffer focusBeam = CachedBufferer.partial(COPartialModels.FOCUS_BEAM, blockState)
-                    .disableDiffuse()
-
-                    .light(LightTexture.FULL_BRIGHT);
-
-            VertexConsumer vb1 = buffer.getBuffer(getBeamRenderType());
-            SuperByteBuffer focusBeam1 = CachedBufferer.partial(COPartialModels.FOCUS_BEAM_GLOW, blockState)
-                    .light(LightTexture.FULL_BRIGHT)
-                    .disableDiffuse();
-
-
-            Direction.Axis rotDirection = direction.getStepX() == 0 ? direction.getClockWise().getAxis() : direction.getAxis();
-            float rot_off = AngleHelper.rad(90 - direction.toYRot());
-            kineticRotationTransform(focusBeam, be, Direction.Axis.Y, rot_off, light);
-            kineticRotationTransform(focusBeam1, be, Direction.Axis.Y, rot_off, light);
-
-            kineticRotationTransform(focusBeam, be, rotDirection, AngleHelper.rad(angle), light);//.renderInto(ms, vb);
-            kineticRotationTransform(focusBeam1, be, rotDirection, AngleHelper.rad(angle), light);//.renderInto(ms, vb1);
-            be.getBeamSourceInstance().optionalBeamProperties().ifPresent(beamProperties -> {
-                focusBeam.color(beamProperties.color.getX(), beamProperties.color.getY(),beamProperties.color.getZ(), 255).light(15728880).renderInto(ms, vb);
-                focusBeam1.color(beamProperties.color.getX(), beamProperties.color.getY(),beamProperties.color.getZ(), 255).light(15728880).renderInto(ms, vb1);
-            });
+                    ms.popPose();
+                }
+            }
         }
-        ms.popPose();
     }
 
-    private SuperByteBuffer rotateLaser(SuperByteBuffer buffer, double angle, Direction facing) {
-        float pivotX = 8F / 16f;
-        float pivotY = 8f / 16f;
-        float pivotZ = 8F / 16f;
-        buffer.rotateCentered(Direction.UP, (float) (AngleHelper.rad(AngleHelper.horizontalAngle(facing.getCounterClockWise())) - 1.F * Math.PI));
-        buffer.translate(pivotX, pivotY, pivotZ);
-        buffer.rotate(facing, AngleHelper.rad(angle));
-        buffer.translate(-pivotX, -pivotY, -pivotZ);
-        return buffer;
+    private float getYOffset(BeamFocuserBlockEntity be, float pt, int index) {
+        int ticks = ((index * CYCLE_TICK / 2) + be.getProcessDuration() + 5
+                - be.processingTicks) % CYCLE_TICK;
+        return (ticks + pt) * (HEIGHT / (float) CYCLE_TICK);
     }
-
-    public RenderType getBeamRenderType(){
-        RenderType renderType = RenderType.create("create_optical:laser", DefaultVertexFormat.BLOCK,
-                VertexFormat.Mode.QUADS, 256, true, true, RenderType.CompositeState.builder()
-                        .setWriteMaskState(new RenderStateShard.WriteMaskStateShard(true, true))
-                        .setDepthTestState(new RenderStateShard.DepthTestStateShard("<=", 515))
-                        .setCullState(new RenderStateShard.CullStateShard(false))
-                        .setTextureState(new RenderStateShard.TextureStateShard(TextureAtlas.LOCATION_BLOCKS, false, true))
-                        .setTransparencyState(new RenderStateShard.TransparencyStateShard("translucent_transparency", () -> {
-                            RenderSystem.enableBlend();
-                            RenderSystem.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE);
-                        }, () -> {
-                            RenderSystem.disableBlend();
-                            RenderSystem.defaultBlendFunc();
-                        }))
-                        .setOutputState(new RenderStateShard.OutputStateShard("translucent_var", () -> {
-                            if (Minecraft.useShaderTransparency()) {
-                                Minecraft.getInstance().levelRenderer.getTranslucentTarget().bindWrite(false);
-                            }
-                        }, () -> {
-                            if (Minecraft.useShaderTransparency()) {
-                                Minecraft.getInstance().getMainRenderTarget().bindWrite(false);
-                            }
-                        }))
-                        .setLightmapState(new RenderStateShard.LightmapStateShard(true))
-                        .setShaderState(new RenderStateShard.ShaderStateShard(GameRenderer::getRendertypeTranslucentShader))
-                        .createCompositeState(false));
-        return renderType;
-    }
-
 }

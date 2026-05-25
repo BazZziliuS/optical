@@ -1,0 +1,7 @@
+{
+    "parent": "create_optical:block/optical_sensor/base",
+    "textures": {
+        "particle": "create:block/copper_casing",
+        "top": "create_optical:block/optical_sensor/sensor_base_copper"
+    }
+}   

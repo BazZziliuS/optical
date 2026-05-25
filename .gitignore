@@ -18,12 +18,9 @@ build
 .gradle
 
 # other
-.gitignore
 eclipse
 run
+runs
 run-data
 
-# Files from Forge MDK
-forge*changelog.txt
-
-run-data/logs
+repo
