@@ -30,7 +30,8 @@ public class BeamFocuserRenderer extends ShaftRenderer<BeamFocuserBlockEntity> {
         super.renderSafe(be, partialTicks, ms, buffer, light, overlay);
         FilteringRenderer.renderOnBlockEntity(be, partialTicks, ms, buffer, light, overlay);
         if (VisualizationManager.supportsVisualization(be.getLevel())) {
-            if (be.processingTicks >= 5 && be.getOptionalBeamProperties().isPresent()) {
+            if (be.processingTicks >= 5 && be.getOptionalBeamProperties().isPresent()
+                    && COPartialModels.FOCUS_BEAM.get() != null) {
                 Vec3i color = be.getOptionalBeamProperties().get().color();
                 ms.translate(0, 4 / 16f, 0);
                 for (int i = 0; i < 2; i++) {

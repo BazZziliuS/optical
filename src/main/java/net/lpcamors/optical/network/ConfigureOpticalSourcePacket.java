@@ -6,6 +6,7 @@ import java.util.Map;
 
 import com.simibubi.create.foundation.networking.BlockEntityDataPacket;
 
+import io.netty.buffer.ByteBuf;
 import net.createmod.catnip.codecs.stream.CatnipStreamCodecBuilders;
 import net.lpcamors.optical.blocks.optical_source.BeamHelper;
 import net.lpcamors.optical.blocks.optical_source.BeamHelper.BeamProperties;
@@ -18,13 +19,29 @@ import net.minecraft.network.codec.StreamCodec;
 
 public class ConfigureOpticalSourcePacket extends BlockEntityDataPacket<GenericOpticalSourceBlockEntity> {
 
-    public static final StreamCodec<RegistryFriendlyByteBuf, ConfigureOpticalSourcePacket> STREAM_CODEC = StreamCodec
-            .composite(
-                    BlockPos.STREAM_CODEC, packet -> packet.pos,
-                    CatnipStreamCodecBuilders.list(BeamSection.CODEC), p -> p.sections,
-                    ByteBufCodecs.map(HashMap::new, BlockPos.STREAM_CODEC, BeamHelper.PROPERTIES_CODEC),
-                    packet -> packet.activators,
-                    ConfigureOpticalSourcePacket::new);
+    private static final StreamCodec<ByteBuf, List<BeamSection>> SECTIONS_CODEC =
+            CatnipStreamCodecBuilders.list(BeamSection.CODEC);
+    private static final StreamCodec<ByteBuf, Map<BlockPos, BeamHelper.BeamProperties>> ACTIVATORS_CODEC =
+            ByteBufCodecs.map(HashMap::new, BlockPos.STREAM_CODEC, BeamHelper.PROPERTIES_CODEC);
+
+    public static final StreamCodec<RegistryFriendlyByteBuf, ConfigureOpticalSourcePacket> STREAM_CODEC =
+            new StreamCodec<>() {
+                @Override
+                public ConfigureOpticalSourcePacket decode(RegistryFriendlyByteBuf buf) {
+                    BlockPos pos = BlockPos.STREAM_CODEC.decode(buf);
+                    List<BeamSection> sections = SECTIONS_CODEC.decode(buf);
+                    Map<BlockPos, BeamHelper.BeamProperties> activators =
+                            buf.isReadable() ? ACTIVATORS_CODEC.decode(buf) : new HashMap<>();
+                    return new ConfigureOpticalSourcePacket(pos, sections, activators);
+                }
+
+                @Override
+                public void encode(RegistryFriendlyByteBuf buf, ConfigureOpticalSourcePacket packet) {
+                    BlockPos.STREAM_CODEC.encode(buf, packet.pos);
+                    SECTIONS_CODEC.encode(buf, packet.sections);
+                    ACTIVATORS_CODEC.encode(buf, packet.activators);
+                }
+            };
 
     public final BlockPos pos;
     public final List<BeamSection> sections;

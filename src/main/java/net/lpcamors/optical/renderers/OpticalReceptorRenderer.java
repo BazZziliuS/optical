@@ -25,6 +25,7 @@ public class OpticalReceptorRenderer extends ShaftRenderer<OpticalReceptorBlockE
         ms.translate(0, 0, 0);
         be.sensors.forEach((dirs, stack) -> {
             if (!stack.isEmpty()) {
+                if (COPartialModels.OPTICAL_DEVICE_HORIZONTAL.get() == null) return;
                 SuperByteBuffer cube = CachedBuffers.partial(COPartialModels.OPTICAL_DEVICE_HORIZONTAL, state).center()
                         .light(light);
                 cube.rotateToFace(dirs);

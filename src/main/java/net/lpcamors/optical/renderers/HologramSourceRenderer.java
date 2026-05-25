@@ -79,10 +79,12 @@ public class HologramSourceRenderer extends SafeBlockEntityRenderer<HologramSour
             Vec3i color = beamProperties.color();
 
             ms.pushPose();
-            SuperByteBuffer cube = CachedBuffers.partial(COPartialModels.HOLOGRAM_BEAM, be.getBlockState()).center()
-                    .light(LightTexture.FULL_BRIGHT)
-                    .color(color.getX(), color.getY(), color.getZ(), 255);
-            cube.uncenter().renderInto(ms, buffer.getBuffer(CORenderTypes.HOLOGRAM));
+            if (COPartialModels.HOLOGRAM_BEAM.get() != null) {
+                SuperByteBuffer cube = CachedBuffers.partial(COPartialModels.HOLOGRAM_BEAM, be.getBlockState()).center()
+                        .light(LightTexture.FULL_BRIGHT)
+                        .color(color.getX(), color.getY(), color.getZ(), 255);
+                cube.uncenter().renderInto(ms, buffer.getBuffer(CORenderTypes.HOLOGRAM));
+            }
             ms.popPose();
 
             if (be.isController()) {

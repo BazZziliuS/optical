@@ -31,15 +31,17 @@ public class OpticalSensorRenderer extends SafeBlockEntityRenderer<OpticalSensor
         float rotation = blockState.getValue(OpticalSensorBlock.HANGING) ? (float) Math.PI : 0.0F;
         ms.pushPose();
 
-        CachedBuffers.partial(COPartialModels.OPTICAL_SENSOR_LAMP_GLOW, blockState)
-                .light(f ? LightTexture.FULL_BRIGHT : light)
-                .color(color.getX(), color.getY(), color.getZ(), 255)
-                .disableDiffuse()
-                .center().rotateX(rotation).uncenter()
-                .renderInto(ms, bufferSource
-                        .getBuffer(f ? CORenderTypes.TRANSPARENT_ADDITIVE : CORenderTypes.TRANSLUCENT_NO_CULL));
+        if (COPartialModels.OPTICAL_SENSOR_LAMP_GLOW.get() != null) {
+            CachedBuffers.partial(COPartialModels.OPTICAL_SENSOR_LAMP_GLOW, blockState)
+                    .light(f ? LightTexture.FULL_BRIGHT : light)
+                    .color(color.getX(), color.getY(), color.getZ(), 255)
+                    .disableDiffuse()
+                    .center().rotateX(rotation).uncenter()
+                    .renderInto(ms, bufferSource
+                            .getBuffer(f ? CORenderTypes.TRANSPARENT_ADDITIVE : CORenderTypes.TRANSLUCENT_NO_CULL));
+        }
 
-        if (f) {
+        if (f && COPartialModels.OPTICAL_SENSOR_LAMP.get() != null) {
             CachedBuffers.partial(COPartialModels.OPTICAL_SENSOR_LAMP, blockState)
                     .light(LightTexture.FULL_BRIGHT / 2)
                     .color(color.getX(), color.getY(), color.getZ(), 255)

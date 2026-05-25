@@ -26,6 +26,7 @@ public class EncasedMirrorRenderer extends ShaftRenderer<EncasedMirrorBlockEntit
             MultiBufferSource bufferSource, int light, int overlay) {
         super.renderSafe(be, partialTicks, ms, bufferSource, light, overlay);
         BlockState state = be.getBlockState();
+        if (COPartialModels.MIRROR.get() == null) return;
         SuperByteBuffer mirror = CachedBuffers.partial(COPartialModels.MIRROR, state);
 
         var facing = state.getValue(BlockStateProperties.FACING).getOpposite();
